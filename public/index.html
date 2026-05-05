@@ -211,7 +211,7 @@
 
   <!-- Upload card -->
   <div class="card">
-    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="drop-zone" id="dropZone">
       <div class="icon">📊</div>
       <div class="hint">
         拖放 <strong>Planning for Timetable.xlsx</strong> 至此<br>
@@ -222,7 +222,7 @@
       </div>
     </div>
     <input type="file" id="fileInput" accept=".xlsx" style="display:none">
-    <button class="btn" id="generateBtn" onclick="generate()" disabled>
+    <button class="btn" id="generateBtn" disabled>
       ⚙ 生成時間表 &nbsp; Generate Timetable
     </button>
   </div>
@@ -295,8 +295,10 @@
     generateBtn.disabled = false;
   }
 
+  // Wire up all events without inline onclick
+  generateBtn.addEventListener('click', generate);
+  dropZone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
-
   dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', e => {
@@ -416,14 +418,21 @@
   const SLOT_LBL   = {'0900 - 1100':'0900','1100 - 1300':'1100','1400 - 1600':'1400','1600 - 1800':'1600'};
   let _grid = {}, _activeDay = null;
 
+  // Event delegation for day tabs — no inline onclick needed
+  document.getElementById('dayTabs').addEventListener('click', e => {
+    const btn = e.target.closest('.day-tab');
+    if (btn) selectDay(btn.dataset.day);
+  });
+
   function renderGrid(grid) {
     _grid = grid;
     const days = DAY_ORDER.filter(d => grid[d] && Object.keys(grid[d]).length);
     if (!days.length) return;
     _activeDay = _activeDay && grid[_activeDay] ? _activeDay : days[0];
 
+    // Use data-day attribute instead of inline onclick
     document.getElementById('dayTabs').innerHTML = days.map(d =>
-      `<button class="day-tab${_activeDay===d?' active':''}" onclick="selectDay('${d}')">${d.slice(0,3)}</button>`
+      `<button class="day-tab${_activeDay===d?' active':''}" data-day="${d}">${d.slice(0,3)}</button>`
     ).join('');
     showDayGrid(_activeDay);
   }
@@ -431,7 +440,7 @@
   function selectDay(day) {
     _activeDay = day;
     document.querySelectorAll('.day-tab').forEach(b =>
-      b.classList.toggle('active', b.textContent === day.slice(0,3)));
+      b.classList.toggle('active', b.dataset.day === day));
     showDayGrid(day);
   }
 

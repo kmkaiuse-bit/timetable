@@ -14,6 +14,17 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
 
 
+@app.after_request
+def add_security_headers(response):
+    # Allow inline scripts/styles for this internal tool
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline';"
+    )
+    return response
+
+
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_ui(path):
