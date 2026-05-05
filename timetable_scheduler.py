@@ -52,14 +52,25 @@ DAY_TO_SHEET = {
     "Friday":    "Fri(Term1)",
 }
 
-# Starting column (1-based) of each time slot group in daily timetable sheets
-# Each group occupies 5 columns: Code, ClassSize, Subject, Lecturer, Time
-SLOT_TO_START_COL = {
-    "0900 - 1100": 5,    # col E
-    "1100 - 1300": 10,   # col J
-    "1400 - 1600": 22,   # col V
-    "1600 - 1800": 27,   # col AA
+# Map the raw header marker value -> our slot key
+# Markers can be strings ('0900') or integers (1400) depending on the sheet
+_MARKER_TO_SLOT = {
+    "0900": "0900 - 1100",   900:  "0900 - 1100",
+    "1100": "1100 - 1300",   1100: "1100 - 1300",
+    "1400": "1400 - 1600",   1400: "1400 - 1600",
+    "1600": "1600 - 1800",   1600: "1600 - 1800",
 }
+
+def _slot_cols_for_sheet(ws) -> dict:
+    """Read the time-slot start columns dynamically from a sheet's row 1.
+    Returns {slot_key: start_col_1based}.  Each day sheet can differ."""
+    row1 = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+    result = {}
+    for i, val in enumerate(row1):
+        slot = _MARKER_TO_SLOT.get(val)
+        if slot:
+            result[slot] = i + 1   # convert to 1-based
+    return result
 
 # Map class centre suffix -> room code prefix for preferred room matching
 CLASS_CENTRE_TO_ROOM_PREFIX = {
@@ -380,8 +391,8 @@ def write_output_wb(wb, scheduled: list):
             if val and isinstance(val, str) and " - " in val:
                 room_row_map[val] = row[0].row
 
-        # Fill each slot group
-        for slot, start_col in SLOT_TO_START_COL.items():
+        # Fill each slot group — positions read dynamically (Wed/Fri differ from Mon)
+        for slot, start_col in _slot_cols_for_sheet(ws).items():
             for room_code, row_num in room_row_map.items():
                 sc = slot_lookup.get((day, room_code, slot))
                 if sc:
@@ -391,8 +402,8 @@ def write_output_wb(wb, scheduled: list):
                     ws.cell(row_num, start_col + 3, sc.lecturer1)
                     # start_col + 4 = Time col: leave blank (standard slot)
                 else:
-                    # Clear any pre-existing non-formula data
-                    for offset in range(4):
+                    # Clear all 5 columns of this slot group (Code, Size, Subject, Lecturer, Time)
+                    for offset in range(5):
                         cell = ws.cell(row_num, start_col + offset)
                         if (cell.value is not None and
                                 not str(cell.value).startswith("=")):
