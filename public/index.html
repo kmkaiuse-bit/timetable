@@ -308,9 +308,7 @@
   });
 
   function show(id, visible) {
-    const el = document.getElementById(id);
-    if (id === 'results') el.style.display = visible ? 'block' : 'none';
-    else el.style.display = visible ? '' : 'none';
+    document.getElementById(id).style.display = visible ? 'block' : 'none';
   }
 
   async function generate() {
