@@ -320,6 +320,14 @@ Then on vercel.com: Import repo → Framework Preset: Other → Deploy.
 
 ---
 
+## Future Improvements
+
+| Item | Notes |
+|------|-------|
+| **Lecturer 2 / 3 auto-assignment** | Rules unclear — needs clarification on whether it's by class size, subject type, or fixed teacher pairing. Kept as manual step for now. UI shows explicit reminder to fill after download. |
+| **Non-standard start times** | Some classes use 8:30, 10:30, 13:00 slots. MVP uses standard slots only. Could add a configurable time-slot list. |
+| **Teacher-centre affinity** | Currently teachers are assigned round-robin. Could improve by preferring teachers who historically teach at a specific centre. |
+
 ## Sources & References
 
 - Origin plan: `docs/plans/2026-05-05-001-feat-teacher-timetable-scheduler-plan.md`
