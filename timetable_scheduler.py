@@ -274,10 +274,40 @@ def _rooms_by_fit(rooms: list, students: int, preferred_prefix: str) -> list:
     return preferred + others
 
 
-def schedule_classes(classes: list, teacher_assignments: dict, rooms: list) -> tuple:
+def read_existing_timetable(wb) -> set:
+    """Return set of (day, room_code, slot) already occupied in the template sheets.
+    Passed to schedule_classes so the greedy avoids those slots."""
+    occupied = set()
+    for day, sheet_name in DAY_TO_SHEET.items():
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        slot_cols = _slot_cols_for_sheet(ws)
+        for row in ws.iter_rows(min_row=3, max_row=37, max_col=1):
+            room_code = row[0].value
+            if not room_code or " - " not in str(room_code):
+                continue
+            for slot, start_col in slot_cols.items():
+                code_val = ws.cell(row[0].row, start_col).value
+                if code_val and str(code_val).strip() not in ("", "0"):
+                    occupied.add((day, str(room_code), slot))
+    return occupied
+
+
+def schedule_classes(
+    classes: list,
+    teacher_assignments: dict,
+    rooms: list,
+    pre_occupied: set = None,
+) -> tuple:
     teacher_busy: dict = defaultdict(lambda: defaultdict(set))
     room_busy:    dict = defaultdict(lambda: defaultdict(set))
     centre_day:   dict = defaultdict(lambda: defaultdict(int))
+
+    # Pre-mark slots already used by existing classes in the template
+    if pre_occupied:
+        for day, room_code, slot in pre_occupied:
+            room_busy[room_code][day].add(slot)
 
     # Largest classes first, 4-hr before 2-hr
     sorted_classes = sorted(classes, key=lambda c: (-c.students, -c.loading))
@@ -401,13 +431,7 @@ def write_output_wb(wb, scheduled: list):
                     ws.cell(row_num, start_col + 2, sc.entry.subject_cn)
                     ws.cell(row_num, start_col + 3, sc.lecturer1)
                     # start_col + 4 = Time col: leave blank (standard slot)
-                else:
-                    # Clear all 5 columns of this slot group (Code, Size, Subject, Lecturer, Time)
-                    for offset in range(5):
-                        cell = ws.cell(row_num, start_col + offset)
-                        if (cell.value is not None and
-                                not str(cell.value).startswith("=")):
-                            cell.value = None
+                # No else: preserve existing data for classes not in our Class list
 
 
 
@@ -487,13 +511,16 @@ def run_from_bytes(excel_bytes: bytes) -> tuple:
     """
     from io import BytesIO
 
-    wb_read = openpyxl.load_workbook(BytesIO(excel_bytes), data_only=True)
-    classes  = read_classes(wb_read)
-    teachers = read_teachers(wb_read)
-    rooms    = read_rooms(wb_read)
+    wb_read      = openpyxl.load_workbook(BytesIO(excel_bytes), data_only=True)
+    classes      = read_classes(wb_read)
+    teachers     = read_teachers(wb_read)
+    rooms        = read_rooms(wb_read)
+    pre_occupied = read_existing_timetable(wb_read)
 
     assignments, no_teacher = assign_teachers(classes, teachers)
-    scheduled, unscheduled  = schedule_classes(classes, assignments, rooms)
+    scheduled, unscheduled  = schedule_classes(
+        classes, assignments, rooms, pre_occupied=pre_occupied
+    )
 
     # Load a fresh copy (without data_only) to preserve formulas in output
     wb_out = openpyxl.load_workbook(BytesIO(excel_bytes))
@@ -613,10 +640,12 @@ def main():
     wb_read = openpyxl.load_workbook(INPUT_FILE, data_only=True)
 
     print("[1/5] Reading input data...")
-    classes  = read_classes(wb_read)
-    teachers = read_teachers(wb_read)
-    rooms    = read_rooms(wb_read)
+    classes      = read_classes(wb_read)
+    teachers     = read_teachers(wb_read)
+    rooms        = read_rooms(wb_read)
+    pre_occupied = read_existing_timetable(wb_read)
     print(f"      {len(classes)} classes  |  {len(teachers)} teachers  |  {len(rooms)} rooms")
+    print(f"      {len(pre_occupied)} slots already occupied in template")
 
     print("[2/5] Assigning teachers...")
     assignments, no_teacher = assign_teachers(classes, teachers)
@@ -625,7 +654,9 @@ def main():
         print(f"      WARNING — no eligible teacher for: {no_teacher}")
 
     print("[3/5] Running greedy scheduler...")
-    scheduled, unscheduled = schedule_classes(classes, assignments, rooms)
+    scheduled, unscheduled = schedule_classes(
+        classes, assignments, rooms, pre_occupied=pre_occupied
+    )
     print(f"      {len(scheduled)}/{len(classes)} classes scheduled")
     if unscheduled:
         print(f"      WARNING — could not schedule: {unscheduled}")
