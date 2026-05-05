@@ -6,6 +6,7 @@
       "config": {
         "includeFiles": [
           "api/index.html",
+          "api/template.xlsx",
           "timetable_scheduler.py",
           "db/schema.sql"
         ]

@@ -5,7 +5,7 @@ import sys
 # Allow importing timetable_scheduler from the parent directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from timetable_scheduler import run_from_bytes
 
 # index.html lives in the same directory as this file (api/)
@@ -22,6 +22,18 @@ def serve_ui(path):
         with open(html, encoding="utf-8") as f:
             return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
     return f"<pre>index.html not found at {html}</pre>", 404
+
+
+@app.route("/api/template")
+def download_template():
+    """Serve the Excel template for teachers to download and fill in."""
+    path = os.path.join(_HERE, "template.xlsx")
+    return send_file(
+        path,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name="Planning for Timetable.xlsx",
+    )
 
 
 @app.route("/api/schedule", methods=["POST"])
