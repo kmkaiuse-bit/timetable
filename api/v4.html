@@ -132,6 +132,32 @@
     .slot-DAE106 { border-left: 3px solid #8b5cf6; background: #f5f3ff; }
     .slot-DAE108 { border-left: 3px solid #ef4444; background: #fef2f2; }
 
+    .edited { outline: 2px solid #fbbf24 !important; background: #fffbeb !important; }
+    .drop-target { min-height: 48px; }
+    .drop-target.drag-over { background: #dcfce7 !important; outline: 2px dashed #16a34a; }
+    td[draggable="true"] { cursor: grab; }
+    td[draggable="true"]:active { cursor: grabbing; }
+    .cell-lec[contenteditable] { cursor: text; border-radius: 3px; padding: 1px 3px; min-width: 30px; display: inline-block; }
+    .cell-lec[contenteditable]:hover { background: rgba(255,255,255,.7); }
+    .cell-lec[contenteditable]:focus { outline: 1px solid #16a34a; background: #fff; }
+    .edit-badge {
+      display: none; background: #fbbf24; color: #78350f;
+      border-radius: 12px; padding: 2px 10px; font-size: .73rem;
+      font-weight: 700; margin-left: 10px; vertical-align: middle;
+    }
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 8px;
+      font-size: .85rem; z-index: 999; pointer-events: none;
+      animation: fadeInOut 2.5s ease forwards;
+    }
+    @keyframes fadeInOut {
+      0%  { opacity:0; transform:translateX(-50%) translateY(8px); }
+      15% { opacity:1; transform:translateX(-50%) translateY(0); }
+      80% { opacity:1; }
+      100%{ opacity:0; }
+    }
+
     .download-btn {
       display: flex; align-items: center; justify-content: center; gap: 10px;
       width: 100%; padding: 13px 0;
@@ -205,7 +231,10 @@
   <!-- Results -->
   <div class="results card" id="results">
 
-    <div class="results-title">排班結果 Scheduling Results (v4 · Full Auto-Scheduler)</div>
+    <div class="results-title">
+      排班結果 Scheduling Results (v4 · Full Auto-Scheduler)
+      <span class="edit-badge" id="editBadge"></span>
+    </div>
 
     <div class="stats-grid" id="statsGrid"></div>
     <div id="violationsSection"></div>
@@ -249,125 +278,113 @@
   const fileBadge   = document.getElementById('fileBadge');
   const fileNameTxt = document.getElementById('fileNameTxt');
   const generateBtn = document.getElementById('generateBtn');
-
-  let selectedFile = null;
+  let selectedFile  = null;
 
   function setFile(f) {
     if (!f || !f.name.endsWith('.xlsx')) return;
-    selectedFile = f;
-    fileNameTxt.textContent = f.name;
-    fileBadge.style.display = 'block';
-    generateBtn.disabled = false;
+    selectedFile = f; fileNameTxt.textContent = f.name;
+    fileBadge.style.display = 'block'; generateBtn.disabled = false;
   }
-
   generateBtn.addEventListener('click', generate);
   dropZone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
   dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    setFile(e.dataTransfer.files[0]);
-  });
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); setFile(e.dataTransfer.files[0]); });
 
-  function show(id, visible) {
-    document.getElementById(id).style.display = visible ? 'block' : 'none';
-  }
+  function show(id, visible) { document.getElementById(id).style.display = visible ? 'block' : 'none'; }
 
   async function generate() {
     if (!selectedFile) return;
     generateBtn.disabled = true;
-    show('loading', true);
-    show('errorBox', false);
-    show('results', false);
+    show('loading', true); show('errorBox', false); show('results', false);
     document.getElementById('errorBox').textContent = '';
-
-    const fd = new FormData();
-    fd.append('file', selectedFile);
-
+    const fd = new FormData(); fd.append('file', selectedFile);
     try {
       const res  = await fetch('/api/schedule/v4', { method: 'POST', body: fd });
       const data = await res.json();
       if (data.error) { showError(data.error); return; }
-      renderResults(data.stats, data.file);
-    } catch (err) {
-      showError('Network error: ' + err.message);
-    } finally {
-      show('loading', false);
-      generateBtn.disabled = false;
-    }
+      renderResults(data.stats);
+    } catch (err) { showError('Network error: ' + err.message); }
+    finally { show('loading', false); generateBtn.disabled = false; }
   }
 
   function showError(msg) {
     show('loading', false);
     const box = document.getElementById('errorBox');
-    box.textContent = 'Error: ' + msg;
-    box.style.display = 'block';
+    box.textContent = 'Error: ' + msg; box.style.display = 'block';
     generateBtn.disabled = false;
   }
 
-  function renderResults(stats, fileB64) {
-    const total = stats.total_classes;
-    const sched = stats.scheduled;
-    const viol  = stats.violations.length;
-    const pct   = stats.preferred_pct;
+  const state = { results: [], editedCodes: new Set() };
 
+  function renderResults(stats) {
+    state.results = stats.results || []; state.editedCodes = new Set(); updateEditBadge();
+    const total = stats.total_classes, sched = stats.scheduled;
+    const viol = stats.violations.length, pct = stats.preferred_pct;
     document.getElementById('statsGrid').innerHTML = `
-      <div class="stat ${sched === total ? 'good' : 'warn'}">
-        <div class="stat-num ${sched === total ? 'good' : 'warn'}">${sched}/${total}</div>
+      <div class="stat ${sched===total?'good':'warn'}">
+        <div class="stat-num ${sched===total?'good':'warn'}">${sched}/${total}</div>
         <div class="stat-label">已排班<br>Scheduled</div>
       </div>
-      <div class="stat ${viol === 0 ? 'good' : 'warn'}">
-        <div class="stat-num ${viol === 0 ? 'good' : 'warn'}">${viol}</div>
+      <div class="stat ${viol===0?'good':'warn'}">
+        <div class="stat-num ${viol===0?'good':'warn'}">${viol}</div>
         <div class="stat-label">衝突<br>Violations</div>
       </div>
-      <div class="stat ${pct >= 80 ? 'good' : 'warn'}">
-        <div class="stat-num ${pct >= 80 ? 'good' : 'warn'}">${pct}%</div>
+      <div class="stat ${pct>=80?'good':'warn'}">
+        <div class="stat-num ${pct>=80?'good':'warn'}">${pct}%</div>
         <div class="stat-label">優先日使用率<br>Mon/Tue/Thu</div>
-      </div>
-    `;
-
-    const vs = document.getElementById('violationsSection');
-    vs.innerHTML = viol > 0
+      </div>`;
+    document.getElementById('violationsSection').innerHTML = viol > 0
       ? `<div class="alert alert-err"><p>⚠ Violations (${viol})</p>
-           <ul>${stats.violations.map(v => `<li>${v}</li>`).join('')}</ul></div>`
-      : '';
-
-    const unassigned = stats.unassigned || [];
-    document.getElementById('unscheduledSection').innerHTML = unassigned.length > 0
-      ? `<div class="alert alert-warn"><p>⚠ 未能排班 Unscheduled (${unassigned.length})</p>
-           <ul>${unassigned.map(c => `<li>${c}</li>`).join('')}</ul></div>`
-      : '';
-
-    const dist     = stats.centre_dist;
-    const allDays  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+           <ul>${stats.violations.map(v=>`<li>${v}</li>`).join('')}</ul></div>` : '';
+    const ua = stats.unassigned || [];
+    document.getElementById('unscheduledSection').innerHTML = ua.length > 0
+      ? `<div class="alert alert-warn"><p>⚠ 未能排班 Unscheduled (${ua.length})</p>
+           <ul>${ua.map(c=>`<li>${c}</li>`).join('')}</ul></div>` : '';
+    const dist = stats.centre_dist, allDays = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
     const usedDays = allDays.filter(d => Object.values(dist).some(c => c[d]));
     document.getElementById('centreHead').innerHTML =
-      '<th>Centre</th>' + usedDays.map(d => `<th>${d.slice(0,3)}</th>`).join('');
+      '<th>Centre</th>' + usedDays.map(d=>`<th>${d.slice(0,3)}</th>`).join('');
     document.getElementById('centreBody').innerHTML =
-      Object.entries(dist).sort().map(([centre, dayCounts]) =>
-        `<tr><td>${centre}</td>${usedDays.map(d => `<td>${dayCounts[d] || ''}</td>`).join('')}</tr>`
-      ).join('');
-
-    const bytes = Uint8Array.from(atob(fileB64), c => c.charCodeAt(0));
-    document.getElementById('downloadBtn').href = URL.createObjectURL(
-      new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-    );
-
+      Object.entries(dist).sort().map(([c,dc]) =>
+        `<tr><td>${c}</td>${usedDays.map(d=>`<td>${dc[d]||''}</td>`).join('')}</tr>`).join('');
+    document.getElementById('downloadBtn').onclick = e => { e.preventDefault(); downloadEdited(); };
     renderGrid(stats.timetable_grid || {});
     show('results', true);
   }
 
-  const DAY_ORDER  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-  const SLOT_ORDER = ['0900 - 1100','1100 - 1300','1400 - 1600','1600 - 1800'];
-  const SLOT_LBL   = {'0900 - 1100':'0900','1100 - 1300':'1100','1400 - 1600':'1400','1600 - 1800':'1600'};
-  let _grid = {}, _activeDay = null;
+  async function downloadEdited() {
+    try {
+      const res = await fetch('/api/download', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ results: state.results }),
+      });
+      if (!res.ok) { showError('Download failed'); return; }
+      const blob = await res.blob();
+      const a = Object.assign(document.createElement('a'),
+        { href: URL.createObjectURL(blob), download: 'Timetable_V4_Output.xlsx' });
+      a.click(); URL.revokeObjectURL(a.href);
+    } catch (err) { showError('Download error: ' + err.message); }
+  }
+
+  function updateEditBadge() {
+    const n = state.editedCodes.size, b = document.getElementById('editBadge');
+    if (!b) return; b.textContent = n+' 項已修改'; b.style.display = n ? 'inline-block' : 'none';
+  }
+  function showToast(msg) {
+    const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+    document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
+  }
+
+  const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  let _grid = {}, _activeDay = null, _dragCode = null;
 
   document.getElementById('dayTabs').addEventListener('click', e => {
-    const btn = e.target.closest('.day-tab');
-    if (btn) selectDay(btn.dataset.day);
+    const btn = e.target.closest('.day-tab'); if (btn) selectDay(btn.dataset.day);
   });
+
+  function fmtSlot(s) { return String(s).replace(' - ', '-'); }
 
   function renderGrid(grid) {
     _grid = grid;
@@ -382,40 +399,99 @@
 
   function selectDay(day) {
     _activeDay = day;
-    document.querySelectorAll('.day-tab').forEach(b =>
-      b.classList.toggle('active', b.dataset.day === day));
+    document.querySelectorAll('.day-tab').forEach(b => b.classList.toggle('active', b.dataset.day===day));
     showDayGrid(day);
   }
 
-  function showDayGrid(day) {
-    const dayData = _grid[day] || {};
-    const rooms   = Object.keys(dayData).sort();
-    const slots   = SLOT_ORDER.filter(s => rooms.some(r => dayData[r][s]));
+  function rebuildGrid() {
+    _grid = {};
+    state.results.forEach(r => {
+      if (!r.day || !r.room_code) return;
+      _grid[r.day] = _grid[r.day] || {};
+      _grid[r.day][r.room_code] = _grid[r.day][r.room_code] || {};
+      [r.time1, r.time2].filter(Boolean).forEach(slot => {
+        _grid[r.day][r.room_code][slot] = {
+          code: r.class_code, subject_cn: r.name_cn,
+          subject_en: r.name_en, lec1: r.lec1||'', students: r.student_count||0,
+        };
+      });
+    });
+  }
 
-    if (!rooms.length) {
+  function showDayGrid(day) {
+    const dayData = _grid[day] || {}, rooms = Object.keys(dayData).sort();
+    const slotSet = new Set();
+    rooms.forEach(r => Object.keys(dayData[r]).forEach(s => slotSet.add(s)));
+    const slots = [...slotSet].sort();
+    if (!rooms.length || !slots.length) {
       document.getElementById('gridContainer').innerHTML =
         '<p style="color:#94a3b8;font-size:.85rem;padding:8px 0">No classes on this day.</p>';
       return;
     }
-
-    const thead = `<tr><th>Room</th>${slots.map(s=>`<th>${SLOT_LBL[s]||s}</th>`).join('')}</tr>`;
+    const thead = `<tr><th>Room</th>${slots.map(s=>`<th>${fmtSlot(s)}</th>`).join('')}</tr>`;
     const tbody = rooms.map(room => {
-      const cells = slots.map(slot => {
-        const c = (dayData[room]||{})[slot];
-        if (!c) return '<td></td>';
-        const subj = (c.code||'').split('_')[0];
-        return `<td class="slot-${subj}">
-          <div class="cell-code">${c.code||''}</div>
+      const rd = dayData[room]||{}; let cells='', i=0;
+      while (i < slots.length) {
+        const slot=slots[i], c=rd[slot];
+        if (!c) { cells+=`<td class="drop-target" data-day="${day}" data-room="${room}" data-slot="${slot}"></td>`; i++; continue; }
+        const nextC = i+1<slots.length ? rd[slots[i+1]] : null;
+        const span  = nextC && nextC.code===c.code;
+        const subj  = (c.code||'').split('_')[0];
+        const eCls  = state.editedCodes.has(c.code) ? ' edited' : '';
+        cells += `<td${span?' colspan="2"':''} class="slot-${subj}${eCls}" draggable="true"
+            data-code="${c.code}" data-day="${day}" data-room="${room}" data-slot="${slot}">
+          <div class="cell-code">${c.code}</div>
           <div class="cell-subj">${c.subject_cn||''}</div>
-          <div class="cell-lec">${c.lec1||''}</div>
+          <div class="cell-lec" contenteditable="true" spellcheck="false" data-code="${c.code}">${c.lec1||''}</div>
           <div class="cell-stu">${c.students?c.students+' pax':''}</div>
         </td>`;
-      }).join('');
+        i += span ? 2 : 1;
+      }
       return `<tr><td>${room}</td>${cells}</tr>`;
     }).join('');
-
     document.getElementById('gridContainer').innerHTML =
       `<table class="tt-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+    document.querySelectorAll('.cell-lec[contenteditable]').forEach(el => {
+      el.addEventListener('blur', onLecEdit);
+      el.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();el.blur();} });
+    });
+    document.querySelectorAll('td[draggable="true"]').forEach(td => td.addEventListener('dragstart', onDragStart));
+    document.querySelectorAll('.drop-target').forEach(td => {
+      td.addEventListener('dragover',  e => { e.preventDefault(); td.classList.add('drag-over'); });
+      td.addEventListener('dragleave', () => td.classList.remove('drag-over'));
+      td.addEventListener('drop',      onDrop);
+    });
+  }
+
+  function onLecEdit(e) {
+    const el=e.currentTarget, code=el.dataset.code, newLec=el.textContent.trim();
+    const entry=state.results.find(r=>r.class_code===code);
+    if (!entry||entry.lec1===newLec) return;
+    entry.lec1=newLec; state.editedCodes.add(code);
+    el.closest('td')?.classList.add('edited'); updateEditBadge();
+  }
+
+  function onDragStart(e) {
+    if (e.target.closest('[contenteditable]')) { e.preventDefault(); return; }
+    _dragCode = e.currentTarget.dataset.code; e.dataTransfer.effectAllowed='move';
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    const td=e.currentTarget; td.classList.remove('drag-over');
+    if (!_dragCode) return;
+    const { day:newDay, room:newRoom, slot:newSlot } = td.dataset;
+    const entry=state.results.find(r=>r.class_code===_dragCode);
+    if (!entry) return;
+    const rd=(_grid[newDay]||{})[newRoom]||{};
+    if (rd[newSlot]) { showToast('⚠ '+rd[newSlot].code+' 已在此時間'); _dragCode=null; return; }
+    const allSlots=[...new Set(Object.values(_grid[newDay]||{}).flatMap(r=>Object.keys(r)))].sort();
+    const idx=allSlots.indexOf(newSlot);
+    const newTime2=entry.time2?(allSlots[idx+1]||null):null;
+    if (newTime2&&rd[newTime2]) { showToast('⚠ '+rd[newTime2].code+' 已佔用下一時段'); _dragCode=null; return; }
+    entry.day=newDay; entry.room_code=newRoom; entry.time1=newSlot; entry.time2=newTime2;
+    state.editedCodes.add(_dragCode); _dragCode=null;
+    rebuildGrid(); selectDay(_activeDay); updateEditBadge();
   }
 </script>
 </body>

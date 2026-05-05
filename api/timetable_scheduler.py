@@ -692,6 +692,7 @@ def collect_stats(conn: sqlite3.Connection, results: list, unassigned: list) -> 
         "preferred_pct":   100,
         "centre_dist":     {},
         "timetable_grid":  grid,
+        "results":         results,
     }
 
 

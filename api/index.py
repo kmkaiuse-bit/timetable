@@ -5,7 +5,7 @@ import sys
 # timetable_scheduler.py lives in the same api/ directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, jsonify, request, send_from_directory, send_file
+from flask import Flask, jsonify, request, send_from_directory, send_file, Response
 from timetable_scheduler import run_from_bytes, run_v4_from_bytes
 
 # index.html lives in the same directory as this file (api/)
@@ -62,6 +62,26 @@ def schedule():
             "stats": stats,
             "file":  base64.b64encode(output_bytes).decode("utf-8"),
         })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/download", methods=["POST"])
+def download_edited():
+    from io import BytesIO
+    from timetable_scheduler import write_output_fast
+    data = request.get_json(silent=True) or {}
+    results = data.get("results", [])
+    if not results:
+        return jsonify({"error": "No results provided"}), 400
+    try:
+        output_bytes = write_output_fast(results)
+        return send_file(
+            BytesIO(output_bytes),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name="Timetable_Output.xlsx",
+        )
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
