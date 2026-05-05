@@ -377,121 +377,141 @@
     document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
   }
 
-  const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const DAY_ORDER  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const GRID_STEP  = 30;
   let _grid = {}, _activeDay = null, _dragCode = null;
 
   document.getElementById('dayTabs').addEventListener('click', e => {
     const btn = e.target.closest('.day-tab'); if (btn) selectDay(btn.dataset.day);
   });
 
-  function fmtSlot(s) { return String(s).replace(' - ', '-'); }
+  function timeToMins(t) { const n=parseInt(String(t).trim()); return Math.floor(n/100)*60+n%100; }
+  function slotToRange(slot) { const p=String(slot).split(/\s*-\s*/); return {start:timeToMins(p[0]),end:timeToMins(p[1])}; }
+  function minsToLabel(m) { return String(Math.floor(m/60)).padStart(2,'0')+String(m%60).padStart(2,'0'); }
+  function minsToSlot(s,e) { return minsToLabel(s)+' - '+minsToLabel(e); }
+  function getDurMins(entry) { const {start,end}=slotToRange(entry.time1); if(!entry.time2)return end-start; return slotToRange(entry.time2).end-start; }
+  function buildRoomBlocks(roomData) {
+    const map=new Map();
+    Object.entries(roomData).forEach(([slot,entry])=>{
+      const {start,end}=slotToRange(slot);
+      if(!map.has(entry.code))map.set(entry.code,{start,end,entry});
+      else{const b=map.get(entry.code);b.start=Math.min(b.start,start);b.end=Math.max(b.end,end);}
+    });
+    return [...map.values()].sort((a,b)=>a.start-b.start);
+  }
 
   function renderGrid(grid) {
-    _grid = grid;
-    const days = DAY_ORDER.filter(d => grid[d] && Object.keys(grid[d]).length);
-    if (!days.length) return;
-    _activeDay = _activeDay && grid[_activeDay] ? _activeDay : days[0];
-    document.getElementById('dayTabs').innerHTML = days.map(d =>
+    _grid=grid;
+    const days=DAY_ORDER.filter(d=>grid[d]&&Object.keys(grid[d]).length);
+    if(!days.length)return;
+    _activeDay=_activeDay&&grid[_activeDay]?_activeDay:days[0];
+    document.getElementById('dayTabs').innerHTML=days.map(d=>
       `<button class="day-tab${_activeDay===d?' active':''}" data-day="${d}">${d.slice(0,3)}</button>`
     ).join('');
     showDayGrid(_activeDay);
   }
 
   function selectDay(day) {
-    _activeDay = day;
-    document.querySelectorAll('.day-tab').forEach(b => b.classList.toggle('active', b.dataset.day===day));
+    _activeDay=day;
+    document.querySelectorAll('.day-tab').forEach(b=>b.classList.toggle('active',b.dataset.day===day));
     showDayGrid(day);
   }
 
   function rebuildGrid() {
-    _grid = {};
-    state.results.forEach(r => {
-      if (!r.day || !r.room_code) return;
-      _grid[r.day] = _grid[r.day] || {};
-      _grid[r.day][r.room_code] = _grid[r.day][r.room_code] || {};
-      [r.time1, r.time2].filter(Boolean).forEach(slot => {
-        _grid[r.day][r.room_code][slot] = {
-          code: r.class_code, subject_cn: r.name_cn,
-          subject_en: r.name_en, lec1: r.lec1||'', students: r.student_count||0,
-        };
+    _grid={};
+    state.results.forEach(r=>{
+      if(!r.day||!r.room_code)return;
+      _grid[r.day]=_grid[r.day]||{};
+      _grid[r.day][r.room_code]=_grid[r.day][r.room_code]||{};
+      [r.time1,r.time2].filter(Boolean).forEach(slot=>{
+        _grid[r.day][r.room_code][slot]={code:r.class_code,subject_cn:r.name_cn,subject_en:r.name_en,lec1:r.lec1||'',students:r.student_count||0};
       });
     });
   }
 
   function showDayGrid(day) {
-    const dayData = _grid[day] || {}, rooms = Object.keys(dayData).sort();
-    const slotSet = new Set();
-    rooms.forEach(r => Object.keys(dayData[r]).forEach(s => slotSet.add(s)));
-    const slots = [...slotSet].sort();
-    if (!rooms.length || !slots.length) {
-      document.getElementById('gridContainer').innerHTML =
-        '<p style="color:#94a3b8;font-size:.85rem;padding:8px 0">No classes on this day.</p>';
-      return;
-    }
-    const thead = `<tr><th>Room</th>${slots.map(s=>`<th>${fmtSlot(s)}</th>`).join('')}</tr>`;
-    const tbody = rooms.map(room => {
-      const rd = dayData[room]||{}; let cells='', i=0;
-      while (i < slots.length) {
-        const slot=slots[i], c=rd[slot];
-        if (!c) { cells+=`<td class="drop-target" data-day="${day}" data-room="${room}" data-slot="${slot}"></td>`; i++; continue; }
-        const nextC = i+1<slots.length ? rd[slots[i+1]] : null;
-        const span  = nextC && nextC.code===c.code;
-        const subj  = (c.code||'').split('_')[0];
-        const eCls  = state.editedCodes.has(c.code) ? ' edited' : '';
-        cells += `<td${span?' colspan="2"':''} class="slot-${subj}${eCls}" draggable="true"
-            data-code="${c.code}" data-day="${day}" data-room="${room}" data-slot="${slot}">
-          <div class="cell-code">${c.code}</div>
-          <div class="cell-subj">${c.subject_cn||''}</div>
-          <div class="cell-lec" contenteditable="true" spellcheck="false" data-code="${c.code}">${c.lec1||''}</div>
-          <div class="cell-stu">${c.students?c.students+' pax':''}</div>
-        </td>`;
-        i += span ? 2 : 1;
+    const dayData=_grid[day]||{}, rooms=Object.keys(dayData).sort();
+    if(!rooms.length){document.getElementById('gridContainer').innerHTML='<p style="color:#94a3b8;font-size:.85rem;padding:8px 0">No classes on this day.</p>';return;}
+    let minT=Infinity,maxT=-Infinity;
+    rooms.forEach(r=>buildRoomBlocks(dayData[r]||{}).forEach(b=>{minT=Math.min(minT,b.start);maxT=Math.max(maxT,b.end);}));
+    minT=Math.floor(minT/GRID_STEP)*GRID_STEP; maxT=Math.ceil(maxT/GRID_STEP)*GRID_STEP;
+    const cols=[]; for(let t=minT;t<maxT;t+=GRID_STEP)cols.push(t);
+    const thead=`<tr><th>Room</th>${cols.map(t=>{const onHour=t%60===0;return `<th style="min-width:34px;font-size:.62rem;${onHour?'font-weight:700':'color:#94a3b8;font-weight:400'}">${minsToLabel(t)}</th>`;}).join('')}</tr>`;
+    const tbody=rooms.map(room=>{
+      const blocks=buildRoomBlocks(dayData[room]||{}); let cells='',t=minT;
+      while(t<maxT){
+        const blk=blocks.find(b=>b.start===t);
+        if(blk){
+          const span=(blk.end-blk.start)/GRID_STEP;
+          const subj=(blk.entry.code||'').split('_')[0];
+          const eCls=state.editedCodes.has(blk.entry.code)?' edited':'';
+          cells+=`<td colspan="${span}" class="slot-${subj}${eCls}" draggable="true"
+              data-code="${blk.entry.code}" data-day="${day}" data-room="${room}"
+              data-start="${blk.start}" data-end="${blk.end}">
+            <div class="cell-code">${blk.entry.code}</div>
+            <div class="cell-subj">${blk.entry.subject_cn||''}</div>
+            <div class="cell-lec" contenteditable="true" spellcheck="false" data-code="${blk.entry.code}">${blk.entry.lec1||''}</div>
+            <div class="cell-stu">${blk.entry.students?blk.entry.students+' pax':''}</div>
+          </td>`;
+          t=blk.end;
+        }else{
+          cells+=`<td class="drop-target" data-day="${day}" data-room="${room}" data-start="${t}" data-end="${t+GRID_STEP}"></td>`;
+          t+=GRID_STEP;
+        }
       }
-      return `<tr><td>${room}</td>${cells}</tr>`;
+      return `<tr><td style="white-space:nowrap;font-size:.75rem;padding:5px 8px">${room}</td>${cells}</tr>`;
     }).join('');
-    document.getElementById('gridContainer').innerHTML =
-      `<table class="tt-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
-    document.querySelectorAll('.cell-lec[contenteditable]').forEach(el => {
-      el.addEventListener('blur', onLecEdit);
-      el.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();el.blur();} });
+    document.getElementById('gridContainer').innerHTML=`<table class="tt-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+    document.querySelectorAll('.cell-lec[contenteditable]').forEach(el=>{
+      el.addEventListener('blur',onLecEdit);
+      el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();el.blur();}});
     });
-    document.querySelectorAll('td[draggable="true"]').forEach(td => td.addEventListener('dragstart', onDragStart));
-    document.querySelectorAll('.drop-target').forEach(td => {
-      td.addEventListener('dragover',  e => { e.preventDefault(); td.classList.add('drag-over'); });
-      td.addEventListener('dragleave', () => td.classList.remove('drag-over'));
-      td.addEventListener('drop',      onDrop);
+    document.querySelectorAll('td[draggable="true"]').forEach(td=>td.addEventListener('dragstart',onDragStart));
+    document.querySelectorAll('.drop-target').forEach(td=>{
+      td.addEventListener('dragover',e=>{e.preventDefault();td.classList.add('drag-over');});
+      td.addEventListener('dragleave',()=>td.classList.remove('drag-over'));
+      td.addEventListener('drop',onDrop);
     });
   }
 
   function onLecEdit(e) {
-    const el=e.currentTarget, code=el.dataset.code, newLec=el.textContent.trim();
+    const el=e.currentTarget,code=el.dataset.code,newLec=el.textContent.trim();
     const entry=state.results.find(r=>r.class_code===code);
-    if (!entry||entry.lec1===newLec) return;
-    entry.lec1=newLec; state.editedCodes.add(code);
-    el.closest('td')?.classList.add('edited'); updateEditBadge();
+    if(!entry||entry.lec1===newLec)return;
+    entry.lec1=newLec;state.editedCodes.add(code);el.closest('td')?.classList.add('edited');updateEditBadge();
   }
 
   function onDragStart(e) {
-    if (e.target.closest('[contenteditable]')) { e.preventDefault(); return; }
-    _dragCode = e.currentTarget.dataset.code; e.dataTransfer.effectAllowed='move';
+    if(e.target.closest('[contenteditable]')){e.preventDefault();return;}
+    _dragCode=e.currentTarget.dataset.code; e.dataTransfer.effectAllowed='move';
   }
 
   function onDrop(e) {
     e.preventDefault();
     const td=e.currentTarget; td.classList.remove('drag-over');
-    if (!_dragCode) return;
-    const { day:newDay, room:newRoom, slot:newSlot } = td.dataset;
-    const entry=state.results.find(r=>r.class_code===_dragCode);
-    if (!entry) return;
-    const rd=(_grid[newDay]||{})[newRoom]||{};
-    if (rd[newSlot]) { showToast('⚠ '+rd[newSlot].code+' 已在此時間'); _dragCode=null; return; }
-    const allSlots=[...new Set(Object.values(_grid[newDay]||{}).flatMap(r=>Object.keys(r)))].sort();
-    const idx=allSlots.indexOf(newSlot);
-    const newTime2=entry.time2?(allSlots[idx+1]||null):null;
-    if (newTime2&&rd[newTime2]) { showToast('⚠ '+rd[newTime2].code+' 已佔用下一時段'); _dragCode=null; return; }
-    entry.day=newDay; entry.room_code=newRoom; entry.time1=newSlot; entry.time2=newTime2;
-    state.editedCodes.add(_dragCode); _dragCode=null;
-    rebuildGrid(); selectDay(_activeDay); updateEditBadge();
+    if(!_dragCode)return;
+    const newDay=td.dataset.day,newRoom=td.dataset.room,dropStart=parseInt(td.dataset.start);
+    const dragEntry=state.results.find(r=>r.class_code===_dragCode);
+    if(!dragEntry)return;
+    const durMins=getDurMins(dragEntry),dropEnd=dropStart+durMins;
+    const newTime1=minsToSlot(dropStart,dropStart+120);
+    const newTime2=durMins>120?minsToSlot(dropStart+120,dropEnd):null;
+    const targetBlocks=buildRoomBlocks((_grid[newDay]||{})[newRoom]||{});
+    const occupying=targetBlocks.find(b=>b.start<dropEnd&&b.end>dropStart&&b.entry.code!==_dragCode);
+    if(occupying){
+      const existEntry=state.results.find(r=>r.class_code===occupying.entry.code);
+      if(existEntry){
+        const aDay=dragEntry.day,aRoom=dragEntry.room_code,aT1=dragEntry.time1,aT2=dragEntry.time2;
+        dragEntry.day=existEntry.day;dragEntry.room_code=existEntry.room_code;dragEntry.time1=existEntry.time1;dragEntry.time2=existEntry.time2;
+        existEntry.day=aDay;existEntry.room_code=aRoom;existEntry.time1=aT1;existEntry.time2=aT2;
+        state.editedCodes.add(_dragCode);state.editedCodes.add(occupying.entry.code);
+        showToast('↔ 互換：'+_dragCode.split('_')[1]+' ↔ '+occupying.entry.code.split('_')[1]);
+      }
+    }else{
+      dragEntry.day=newDay;dragEntry.room_code=newRoom;dragEntry.time1=newTime1;dragEntry.time2=newTime2;
+      state.editedCodes.add(_dragCode);
+    }
+    _dragCode=null; rebuildGrid(); selectDay(_activeDay); updateEditBadge();
   }
 </script>
 </body>
