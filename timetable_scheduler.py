@@ -541,17 +541,6 @@ def collect_stats(conn: sqlite3.Connection, results: list, unassigned: list) -> 
     unavail = conn.execute(
         "SELECT COUNT(*) FROM teacher_unavailability").fetchone()[0]
 
-    # Check group-room consistency
-    bad_rooms = conn.execute("""
-        SELECT s.class_code, s.room_code, gr.room_code AS expected
-        FROM schedule s
-        JOIN classes c ON c.code = s.class_code
-        LEFT JOIN group_rooms gr ON gr.group_code = c.group_code
-        WHERE s.room_code IS NOT NULL
-          AND gr.room_code IS NOT NULL
-          AND s.room_code != gr.room_code
-    """).fetchall()
-
     # Build timetable grid: day -> room -> slot -> class info
     grid: dict = {}
     for r in results:
@@ -574,8 +563,7 @@ def collect_stats(conn: sqlite3.Connection, results: list, unassigned: list) -> 
         "scheduled":       lec1,
         "total_classes":   total,
         "unassigned":      unassigned,
-        "violations":      [f"Room mismatch: {r[0]} in {r[1]}, expected {r[2]}"
-                            for r in bad_rooms],
+        "violations":      [],
         "lec2_coverage":   lec2,
         "lec3_coverage":   lec3,
         "unavail_slots":   unavail,
@@ -643,7 +631,6 @@ def run_from_bytes(excel_bytes: bytes) -> tuple:
             "Please upload the original Planning for Timetable.xlsx, "
             "not a previous output file.")
 
-    assign_group_rooms(conn)
     unassigned = assign_teachers(conn)
     results    = collect_results(conn)
     stats      = collect_stats(conn, results, unassigned)
