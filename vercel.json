@@ -2,15 +2,7 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": [
-          "api/index.html",
-          "api/template.xlsx",
-          "timetable_scheduler.py",
-          "db/schema.sql"
-        ]
-      }
+      "use": "@vercel/python"
     }
   ],
   "routes": [

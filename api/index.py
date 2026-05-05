@@ -2,8 +2,8 @@ import base64
 import os
 import sys
 
-# Allow importing timetable_scheduler from the parent directory
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# timetable_scheduler.py lives in the same api/ directory
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, request, send_from_directory, send_file
 from timetable_scheduler import run_from_bytes
