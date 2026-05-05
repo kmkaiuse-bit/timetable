@@ -417,7 +417,15 @@
              const subj = r ? ` <span style="font-weight:400;color:#92400e">${r.name_cn}／${r.name_en}</span>` : '';
              return `<li><strong>${c}</strong>${subj}</li>`;
            }).join('')}</ul>
-           <p style="margin-top:6px;font-weight:400;font-size:.8rem">班別已有時間表，但找不到合資格老師。請檢查 Teacher load table 的 quota 或 Teacher Availability。</p>
+           <div style="margin-top:10px;padding-top:10px;border-top:1px solid #fde68a;font-size:.82rem;font-weight:400;color:#78350f;line-height:1.8">
+             <strong style="display:block;margin-bottom:4px">為什麼排不到老師？常見原因：</strong>
+             <span>① 那個時段所有合資格老師都已在教其他班（時間衝突）<br>
+             ② 老師的可教班數已達上限（Quota 用盡）<br>
+             ③ 沒有老師在 Teacher load table 登記可教這科</span>
+             <strong style="display:block;margin-top:8px;margin-bottom:4px">解決方法：</strong>
+             <span>• 在下方時間表拖移此班到另一時段，再重新下載<br>
+             • 或在 Teacher load table 增加相關老師的 quota，重新上傳</span>
+           </div>
          </div>` : '';
 
     const dist = stats.centre_dist, allDays = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
