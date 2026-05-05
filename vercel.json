@@ -5,7 +5,7 @@
       "use": "@vercel/python",
       "config": {
         "includeFiles": [
-          "public/**",
+          "api/index.html",
           "timetable_scheduler.py",
           "db/schema.sql"
         ]

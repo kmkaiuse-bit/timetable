@@ -8,32 +8,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from flask import Flask, jsonify, request, send_from_directory
 from timetable_scheduler import run_from_bytes
 
-_PUBLIC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public")
+# index.html lives in the same directory as this file (api/)
+_HERE = os.path.dirname(os.path.abspath(__file__))
 
-app = Flask(__name__, static_folder=_PUBLIC)
+app = Flask(__name__)
 
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_ui(path):
-    # Try exact file first (e.g. CSS, JS assets)
-    if path:
-        full = os.path.join(_PUBLIC, path)
-        if os.path.isfile(full):
-            return send_from_directory(_PUBLIC, path)
-
-    # Serve index.html for all other routes
-    html = os.path.join(_PUBLIC, "index.html")
+    html = os.path.join(_HERE, "index.html")
     if os.path.isfile(html):
         with open(html, encoding="utf-8") as f:
             return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
-
-    # Last resort: debug info
-    return (
-        f"<pre>public dir: {_PUBLIC}\n"
-        f"exists: {os.path.isdir(_PUBLIC)}\n"
-        f"files: {os.listdir(_PUBLIC) if os.path.isdir(_PUBLIC) else 'N/A'}</pre>"
-    ), 404
+    return f"<pre>index.html not found at {html}</pre>", 404
 
 
 @app.route("/api/schedule", methods=["POST"])

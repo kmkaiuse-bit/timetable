@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>課程時間表排班系統</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", sans-serif;
+      background: #f0f4fb;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+      color: #fff;
+      padding: 28px 40px;
+      box-shadow: 0 2px 8px rgba(30,64,175,.3);
+    }
+    .header h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; }
+    .header p  { font-size: .875rem; opacity: .75; margin-top: 5px; }
+
+    /* ── Layout ── */
+    .container { max-width: 760px; margin: 36px auto; padding: 0 20px 60px; }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 32px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.04);
+      margin-bottom: 20px;
+    }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed #c7d2fe;
+      border-radius: 10px;
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      user-select: none;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+    .drop-zone .icon { font-size: 2.4rem; margin-bottom: 10px; }
+    .drop-zone .hint { color: #64748b; font-size: .9rem; line-height: 1.5; }
+    .drop-zone .hint strong { color: #1e40af; }
+    .file-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 14px; background: #eff6ff; color: #1d4ed8;
+      border-radius: 6px; padding: 6px 14px; font-size: .83rem; font-weight: 600;
+    }
+
+    /* ── Button ── */
+    .btn {
+      width: 100%; padding: 13px 0;
+      background: #1e40af; color: #fff;
+      border: none; border-radius: 9px;
+      font-size: .98rem; font-weight: 600; cursor: pointer;
+      margin-top: 18px; letter-spacing: .01em;
+      transition: background .15s, transform .1s;
+    }
+    .btn:hover:not(:disabled) { background: #1d4ed8; }
+    .btn:active:not(:disabled) { transform: scale(.99); }
+    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    /* ── Loading ── */
+    .loading {
+      text-align: center; padding: 28px 0;
+      color: #64748b; display: none;
+    }
+    .spinner {
+      display: inline-block; width: 34px; height: 34px;
+      border: 3px solid #e2e8f0; border-top-color: #1e40af;
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { margin-top: 12px; font-size: .9rem; }
+
+    /* ── Error ── */
+    .error-box {
+      background: #fef2f2; border: 1px solid #fca5a5;
+      border-radius: 10px; padding: 14px 18px;
+      color: #b91c1c; font-size: .875rem; display: none;
+      margin-bottom: 20px;
+    }
+
+    /* ── Results ── */
+    .results { display: none; }
+    .results-title {
+      font-size: .75rem; font-weight: 700; color: #64748b;
+      text-transform: uppercase; letter-spacing: .07em; margin-bottom: 14px;
+    }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
+    .stat {
+      background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 10px; padding: 16px 12px; text-align: center;
+    }
+    .stat.good { border-color: #86efac; background: #f0fdf4; }
+    .stat.warn { border-color: #fca5a5; background: #fef2f2; }
+    .stat-num { font-size: 1.75rem; font-weight: 800; color: #1e40af; line-height: 1; }
+    .stat-num.good { color: #16a34a; }
+    .stat-num.warn { color: #dc2626; }
+    .stat-label { font-size: .75rem; color: #64748b; margin-top: 5px; line-height: 1.3; }
+
+    /* ── Alert boxes ── */
+    .alert {
+      border-radius: 8px; padding: 12px 16px;
+      font-size: .83rem; margin-bottom: 16px;
+    }
+    .alert-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .alert-err  { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
+    .alert p { font-weight: 600; margin-bottom: 5px; }
+    .alert ul { padding-left: 16px; }
+    .alert li { margin-top: 2px; }
+
+    /* ── Centre table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    thead tr { background: #f1f5f9; }
+    th { padding: 8px 14px; text-align: left; font-weight: 600; color: #475569; white-space: nowrap; }
+    td { padding: 7px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    tbody tr:last-child td { border-bottom: none; }
+    td:first-child { font-weight: 600; }
+
+    /* ── Download button ── */
+    .download-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 13px 0;
+      background: #16a34a; color: #fff;
+      border: none; border-radius: 9px;
+      font-size: .98rem; font-weight: 600; cursor: pointer;
+      text-decoration: none; margin-top: 22px;
+      transition: background .15s;
+    }
+    .download-btn:hover { background: #15803d; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>課程時間表排班系統</h1>
+  <p>Timetable Scheduler &nbsp;·&nbsp; Upload your Excel file to auto-generate the timetable</p>
+</div>
+
+<div class="container">
+
+  <!-- Instructions notice -->
+  <div class="card" style="border-left: 4px solid #3b82f6; background: #eff6ff;">
+    <div style="font-size:.8rem; font-weight:700; color:#1e40af; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;">
+      使用說明 How to Use
+    </div>
+    <ul style="font-size:.875rem; color:#1e3a8a; padding-left:18px; line-height:1.9;">
+      <li>上傳 <strong>Planning for Timetable.xlsx</strong>（包含已填好時間/課室的 Class list answer）</li>
+      <li>如有老師變動，先更新 <strong>Teacher load table</strong> 再上傳</li>
+      <li>如老師有不可用時間，在 Excel 加一張 <strong>Teacher Availability</strong> sheet：<br>
+          <span style="font-size:.8rem;color:#3b82f6">欄位格式：Teacher | Mon 0900 | Mon 1100 | … | Fri 1600<br>填 <strong>N</strong> 表示該時段不可用，空白 = 可用</span></li>
+      <li>系統自動分配 Lecturer 1（主教）及 Lecturer 2/3（後備）</li>
+      <li>下載後如需調整個別老師安排，直接在 Excel 修改即可</li>
+    </ul>
+  </div>
+
+  <!-- Upload card -->
+  <div class="card">
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">📊</div>
+      <div class="hint">
+        拖放 <strong>Planning for Timetable.xlsx</strong> 至此<br>
+        或按此選擇檔案 / Click to browse
+      </div>
+      <div id="fileBadge" style="display:none">
+        <span class="file-badge">📎 <span id="fileNameTxt"></span></span>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx" style="display:none">
+    <button class="btn" id="generateBtn" onclick="generate()" disabled>
+      ⚙ 生成時間表 &nbsp; Generate Timetable
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>排班中，請稍候… &nbsp; Processing, please wait…</p>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Results -->
+  <div class="results card" id="results">
+
+    <div class="results-title">排班結果 Scheduling Results (v3 · SQLite engine)</div>
+
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div id="violationsSection"></div>
+    <div id="unscheduledSection"></div>
+
+    <div class="results-title" style="margin-top:20px">Centre Distribution</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="centreHead"></tr></thead>
+        <tbody id="centreBody"></tbody>
+      </table>
+    </div>
+
+    <div class="alert alert-warn" style="margin-top:16px">
+      <p>如需人手調整 Manual adjustments (if needed):</p>
+      <ul>
+        <li>個別老師安排 — 直接在 Excel 修改 Lecturer 欄</li>
+        <li>非標準開始時間（如 8:30）— 在 Class list answer 的 Time 欄調整</li>
+      </ul>
+    </div>
+
+    <a class="download-btn" id="downloadBtn" href="#" download="Timetable_Output.xlsx">
+      ⬇ &nbsp;下載 Download &nbsp; Timetable_Output.xlsx
+    </a>
+
+  </div><!-- /results -->
+
+</div><!-- /container -->
+
+<script>
+  const dropZone    = document.getElementById('dropZone');
+  const fileInput   = document.getElementById('fileInput');
+  const fileBadge   = document.getElementById('fileBadge');
+  const fileNameTxt = document.getElementById('fileNameTxt');
+  const generateBtn = document.getElementById('generateBtn');
+
+  let selectedFile = null;
+
+  function setFile(f) {
+    if (!f || !f.name.endsWith('.xlsx')) return;
+    selectedFile = f;
+    fileNameTxt.textContent = f.name;
+    fileBadge.style.display = 'block';
+    generateBtn.disabled = false;
+  }
+
+  fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    setFile(e.dataTransfer.files[0]);
+  });
+
+  function show(id, visible) {
+    const el = document.getElementById(id);
+    if (id === 'results') el.style.display = visible ? 'block' : 'none';
+    else el.style.display = visible ? '' : 'none';
+  }
+
+  async function generate() {
+    if (!selectedFile) return;
+    generateBtn.disabled = true;
+    show('loading', true);
+    show('errorBox', false);
+    show('results', false);
+    document.getElementById('errorBox').textContent = '';
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    try {
+      const res  = await fetch('/api/schedule', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.error) { showError(data.error); return; }
+      renderResults(data.stats, data.file);
+    } catch (err) {
+      showError('Network error: ' + err.message);
+    } finally {
+      show('loading', false);
+      generateBtn.disabled = false;
+    }
+  }
+
+  function showError(msg) {
+    show('loading', false);
+    const box = document.getElementById('errorBox');
+    box.textContent = 'Error: ' + msg;
+    box.style.display = 'block';
+    generateBtn.disabled = false;
+  }
+
+  function renderResults(stats, fileB64) {
+    const total = stats.total_classes;
+    const sched = stats.scheduled;
+    const viol  = stats.violations.length;
+    const pct   = stats.preferred_pct;
+
+    // Stats cards
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat ${sched === total ? 'good' : 'warn'}">
+        <div class="stat-num ${sched === total ? 'good' : 'warn'}">${sched}/${total}</div>
+        <div class="stat-label">已排班<br>Scheduled</div>
+      </div>
+      <div class="stat ${viol === 0 ? 'good' : 'warn'}">
+        <div class="stat-num ${viol === 0 ? 'good' : 'warn'}">${viol}</div>
+        <div class="stat-label">衝突<br>Violations</div>
+      </div>
+      <div class="stat ${pct >= 80 ? 'good' : 'warn'}">
+        <div class="stat-num ${pct >= 80 ? 'good' : 'warn'}">${pct}%</div>
+        <div class="stat-label">優先日使用率<br>Mon/Tue/Thu</div>
+      </div>
+    `;
+
+    // Violations list
+    const vs = document.getElementById('violationsSection');
+    vs.innerHTML = stats.violations.length > 0
+      ? `<div class="alert alert-err">
+           <p>⚠ Violations (${stats.violations.length})</p>
+           <ul>${stats.violations.map(v => `<li>${v}</li>`).join('')}</ul>
+         </div>`
+      : '';
+
+    // Unscheduled list
+    const us = document.getElementById('unscheduledSection');
+    us.innerHTML = stats.unscheduled.length > 0
+      ? `<div class="alert alert-warn">
+           <p>⚠ 未能排班 Unscheduled (${stats.unscheduled.length})</p>
+           <ul>${stats.unscheduled.map(c => `<li>${c}</li>`).join('')}</ul>
+         </div>`
+      : '';
+
+    // Centre distribution table
+    const dist     = stats.centre_dist;
+    const allDays  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    const usedDays = allDays.filter(d => Object.values(dist).some(c => c[d]));
+
+    document.getElementById('centreHead').innerHTML =
+      '<th>Centre</th>' + usedDays.map(d => `<th>${d.slice(0,3)}</th>`).join('');
+    document.getElementById('centreBody').innerHTML =
+      Object.entries(dist).sort().map(([centre, dayCounts]) =>
+        `<tr><td>${centre}</td>${usedDays.map(d =>
+          `<td>${dayCounts[d] || ''}</td>`).join('')}</tr>`
+      ).join('');
+
+    // Download link
+    const bytes = Uint8Array.from(atob(fileB64), c => c.charCodeAt(0));
+    const blob  = new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    document.getElementById('downloadBtn').href = URL.createObjectURL(blob);
+
+    show('results', true);
+  }
+</script>
+</body>
+</html>
