@@ -542,17 +542,36 @@ def collect_stats(conn: sqlite3.Connection, results: list, unassigned: list) -> 
           AND s.room_code != gr.room_code
     """).fetchall()
 
+    # Build timetable grid: day -> room -> slot -> class info
+    grid: dict = {}
+    for r in results:
+        day  = r.get("day")
+        room = r.get("room_code") or ""
+        if not day or not room:
+            continue
+        grid.setdefault(day, {}).setdefault(room, {})
+        for slot in [r.get("time1"), r.get("time2")]:
+            if slot:
+                grid[day][room][slot] = {
+                    "code":       r["class_code"],
+                    "subject_cn": r["name_cn"],
+                    "subject_en": r["name_en"],
+                    "lec1":       r.get("lec1") or "",
+                    "students":   r.get("student_count") or 0,
+                }
+
     return {
-        "scheduled":      lec1,
-        "total_classes":  total,
-        "unassigned":     unassigned,
-        "violations":     [f"Room mismatch: {r[0]} in {r[1]}, expected {r[2]}"
-                           for r in bad_rooms],
-        "lec2_coverage":  lec2,
-        "lec3_coverage":  lec3,
-        "unavail_slots":  unavail,
-        "preferred_pct":  100,
-        "centre_dist":    {},
+        "scheduled":       lec1,
+        "total_classes":   total,
+        "unassigned":      unassigned,
+        "violations":      [f"Room mismatch: {r[0]} in {r[1]}, expected {r[2]}"
+                            for r in bad_rooms],
+        "lec2_coverage":   lec2,
+        "lec3_coverage":   lec3,
+        "unavail_slots":   unavail,
+        "preferred_pct":   100,
+        "centre_dist":     {},
+        "timetable_grid":  grid,
     }
 
 

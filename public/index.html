@@ -24,7 +24,7 @@
     .header p  { font-size: .875rem; opacity: .75; margin-top: 5px; }
 
     /* ── Layout ── */
-    .container { max-width: 760px; margin: 36px auto; padding: 0 20px 60px; }
+    .container { max-width: 960px; margin: 36px auto; padding: 0 20px 60px; }
 
     .card {
       background: #fff;
@@ -131,6 +131,40 @@
     tbody tr:last-child td { border-bottom: none; }
     td:first-child { font-weight: 600; }
 
+    /* ── Timetable grid ── */
+    .day-tab {
+      padding: 6px 16px; border: 1.5px solid #c7d2fe; border-radius: 6px;
+      background: #fff; color: #1e40af; font-size: .82rem; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    .day-tab.active { background: #1e40af; color: #fff; border-color: #1e40af; }
+    .day-tab:hover:not(.active) { background: #eff6ff; }
+
+    .tt-table { border-collapse: collapse; font-size: .78rem; min-width: 600px; }
+    .tt-table th {
+      background: #1e40af; color: #fff; padding: 7px 10px;
+      text-align: center; white-space: nowrap; font-weight: 600;
+    }
+    .tt-table th:first-child { text-align: left; background: #1e3a8a; }
+    .tt-table td {
+      border: 1px solid #e2e8f0; padding: 5px 8px; vertical-align: top;
+      min-width: 110px; min-height: 48px;
+    }
+    .tt-table tr:nth-child(even) td:first-child { background: #f8fafc; }
+    .tt-table td:first-child {
+      font-weight: 600; color: #374151; background: #f8fafc;
+      white-space: nowrap; font-size: .77rem;
+    }
+    .cell-code  { font-weight: 700; font-size: .78rem; color: #1e293b; }
+    .cell-subj  { font-size: .72rem; color: #475569; margin-top: 1px; }
+    .cell-lec   { font-size: .7rem;  color: #64748b; margin-top: 2px; }
+    .cell-stu   { font-size: .65rem; color: #94a3b8; }
+    .slot-DAE101 { border-left: 3px solid #3b82f6; background: #eff6ff; }
+    .slot-DAE102 { border-left: 3px solid #10b981; background: #f0fdf4; }
+    .slot-DAE103 { border-left: 3px solid #f59e0b; background: #fffbeb; }
+    .slot-DAE106 { border-left: 3px solid #8b5cf6; background: #f5f3ff; }
+    .slot-DAE108 { border-left: 3px solid #ef4444; background: #fef2f2; }
+
     /* ── Download button ── */
     .download-btn {
       display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -213,7 +247,12 @@
       </table>
     </div>
 
-    <div class="alert alert-warn" style="margin-top:16px">
+    <!-- Download button (prominent) -->
+    <a class="download-btn" id="downloadBtn" href="#" download="Timetable_Output.xlsx">
+      ⬇ &nbsp;下載 Excel &nbsp; Timetable_Output.xlsx
+    </a>
+
+    <div class="alert alert-warn" style="margin-top:14px">
       <p>如需人手調整 Manual adjustments (if needed):</p>
       <ul>
         <li>個別老師安排 — 直接在 Excel 修改 Lecturer 欄</li>
@@ -221,9 +260,12 @@
       </ul>
     </div>
 
-    <a class="download-btn" id="downloadBtn" href="#" download="Timetable_Output.xlsx">
-      ⬇ &nbsp;下載 Download &nbsp; Timetable_Output.xlsx
-    </a>
+    <!-- Timetable Grid -->
+    <div style="margin-top:28px">
+      <div class="results-title">時間表 Timetable</div>
+      <div id="dayTabs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
+      <div id="gridContainer" style="overflow-x:auto;"></div>
+    </div>
 
   </div><!-- /results -->
 
@@ -354,7 +396,67 @@
     });
     document.getElementById('downloadBtn').href = URL.createObjectURL(blob);
 
+    // Timetable grid
+    renderGrid(stats.timetable_grid || {});
+
     show('results', true);
+  }
+
+  // ── Timetable grid ─────────────────────────────────────────────────────────
+
+  const DAY_ORDER  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const SLOT_ORDER = ['0900 - 1100','1100 - 1300','1400 - 1600','1600 - 1800'];
+  const SLOT_LBL   = {'0900 - 1100':'0900','1100 - 1300':'1100','1400 - 1600':'1400','1600 - 1800':'1600'};
+  let _grid = {}, _activeDay = null;
+
+  function renderGrid(grid) {
+    _grid = grid;
+    const days = DAY_ORDER.filter(d => grid[d] && Object.keys(grid[d]).length);
+    if (!days.length) return;
+    _activeDay = _activeDay && grid[_activeDay] ? _activeDay : days[0];
+
+    document.getElementById('dayTabs').innerHTML = days.map(d =>
+      `<button class="day-tab${_activeDay===d?' active':''}" onclick="selectDay('${d}')">${d.slice(0,3)}</button>`
+    ).join('');
+    showDayGrid(_activeDay);
+  }
+
+  function selectDay(day) {
+    _activeDay = day;
+    document.querySelectorAll('.day-tab').forEach(b =>
+      b.classList.toggle('active', b.textContent === day.slice(0,3)));
+    showDayGrid(day);
+  }
+
+  function showDayGrid(day) {
+    const dayData = _grid[day] || {};
+    const rooms   = Object.keys(dayData).sort();
+    const slots   = SLOT_ORDER.filter(s => rooms.some(r => dayData[r][s]));
+
+    if (!rooms.length) {
+      document.getElementById('gridContainer').innerHTML =
+        '<p style="color:#94a3b8;font-size:.85rem;padding:8px 0">No classes on this day.</p>';
+      return;
+    }
+
+    const thead = `<tr><th>Room</th>${slots.map(s=>`<th>${SLOT_LBL[s]||s}</th>`).join('')}</tr>`;
+    const tbody = rooms.map(room => {
+      const cells = slots.map(slot => {
+        const c = (dayData[room]||{})[slot];
+        if (!c) return '<td></td>';
+        const subj = (c.code||'').split('_')[0];
+        return `<td class="slot-${subj}">
+          <div class="cell-code">${c.code||''}</div>
+          <div class="cell-subj">${c.subject_cn||''}</div>
+          <div class="cell-lec">${c.lec1||''}</div>
+          <div class="cell-stu">${c.students?c.students+' pax':''}</div>
+        </td>`;
+      }).join('');
+      return `<tr><td>${room}</td>${cells}</tr>`;
+    }).join('');
+
+    document.getElementById('gridContainer').innerHTML =
+      `<table class="tt-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
   }
 </script>
 </body>
