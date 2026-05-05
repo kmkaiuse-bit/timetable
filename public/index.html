@@ -376,10 +376,11 @@
 
     // Unscheduled list
     const us = document.getElementById('unscheduledSection');
-    us.innerHTML = stats.unscheduled.length > 0
+    const unassigned = stats.unassigned || [];
+    us.innerHTML = unassigned.length > 0
       ? `<div class="alert alert-warn">
-           <p>⚠ 未能排班 Unscheduled (${stats.unscheduled.length})</p>
-           <ul>${stats.unscheduled.map(c => `<li>${c}</li>`).join('')}</ul>
+           <p>⚠ 未能排班 Unscheduled (${unassigned.length})</p>
+           <ul>${unassigned.map(c => `<li>${c}</li>`).join('')}</ul>
          </div>`
       : '';
 
