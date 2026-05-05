@@ -4,182 +4,123 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>V4 全自動排班系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
+  :root {
+    --accent:     #15803d;
+    --accent-mid: #16a34a;
+    --accent-lt:  #f0fdf4;
+    --accent-bd:  #bbf7d0;
+    --surface:    #f0fdf6;
+    --card:       #fff;
+    --text:       #0f172a;
+    --body:       #334155;
+    --muted:      #64748b;
+    --dim:        #94a3b8;
+    --border:     #e2e8f0;
+    --border-s:   #f1f5f9;
+    --r:          14px;
+    --r-sm:       9px;
+    --shadow:     0 1px 3px rgba(0,0,0,.06), 0 4px 20px rgba(0,0,0,.05);
+  }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", sans-serif;
-      background: #f0fdf4;
-      color: #1e293b;
-      min-height: 100vh;
-    }
-
-    .header {
-      background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
-      color: #fff;
-      padding: 28px 40px;
-      box-shadow: 0 2px 8px rgba(21,128,61,.3);
-    }
-    .header h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; }
-    .header p  { font-size: .875rem; opacity: .75; margin-top: 5px; }
-
-    .container { max-width: 960px; margin: 36px auto; padding: 0 20px 60px; }
-
-    .card {
-      background: #fff;
-      border-radius: 14px;
-      padding: 28px 32px;
-      box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.04);
-      margin-bottom: 20px;
-    }
-
-    .drop-zone {
-      border: 2px dashed #bbf7d0;
-      border-radius: 10px;
-      padding: 36px 24px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color .15s, background .15s;
-      user-select: none;
-    }
-    .drop-zone:hover, .drop-zone.drag-over { border-color: #16a34a; background: #f0fdf4; }
-    .drop-zone .icon { font-size: 2.4rem; margin-bottom: 10px; }
-    .drop-zone .hint { color: #64748b; font-size: .9rem; line-height: 1.5; }
-    .drop-zone .hint strong { color: #15803d; }
-    .file-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      margin-top: 14px; background: #f0fdf4; color: #15803d;
-      border-radius: 6px; padding: 6px 14px; font-size: .83rem; font-weight: 600;
-    }
-
-    .btn {
-      width: 100%; padding: 13px 0;
-      background: #15803d; color: #fff;
-      border: none; border-radius: 9px;
-      font-size: .98rem; font-weight: 600; cursor: pointer;
-      margin-top: 18px; letter-spacing: .01em;
-      transition: background .15s, transform .1s;
-    }
-    .btn:hover:not(:disabled) { background: #16a34a; }
+    body { font-family: 'Noto Sans HK', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--surface); color: var(--body); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    .header { background: var(--accent); color: #fff; padding: 20px 40px; }
+    .header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em; }
+    .header p  { font-size: .81rem; opacity: .6; margin-top: 4px; }
+    .container { max-width: 980px; margin: 30px auto; padding: 0 20px 60px; }
+    .card { background: var(--card); border-radius: var(--r); padding: 26px 30px; box-shadow: var(--shadow); border: 1px solid var(--border-s); margin-bottom: 16px; }
+    .info-panel { border-left: 3px solid var(--accent); background: var(--accent-lt); padding: 15px 22px; border-radius: 0 var(--r-sm) var(--r-sm) 0; margin-bottom: 16px; }
+    .drop-zone { border: 1.5px dashed var(--accent-bd); border-radius: var(--r-sm); padding: 34px 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; user-select: none; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent-mid); background: var(--accent-lt); }
+    .drop-zone .icon { font-size: 2.1rem; margin-bottom: 8px; }
+    .drop-zone .hint { color: var(--muted); font-size: .88rem; line-height: 1.6; }
+    .drop-zone .hint strong { color: var(--accent); }
+    .file-badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 13px; background: var(--accent-lt); color: var(--accent); border-radius: 6px; padding: 5px 13px; font-size: .81rem; font-weight: 600; }
+    .btn { width: 100%; padding: 12px 0; background: var(--accent); color: #fff; border: none; border-radius: var(--r-sm); font-size: .95rem; font-weight: 600; cursor: pointer; margin-top: 16px; letter-spacing: .01em; transition: background .15s, transform .1s; font-family: inherit; }
+    .btn:hover:not(:disabled) { background: var(--accent-mid); }
     .btn:active:not(:disabled) { transform: scale(.99); }
-    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
-
-    .loading { text-align: center; padding: 28px 0; color: #64748b; display: none; }
-    .spinner {
-      display: inline-block; width: 34px; height: 34px;
-      border: 3px solid #e2e8f0; border-top-color: #15803d;
-      border-radius: 50%; animation: spin .75s linear infinite;
-    }
+    .btn:disabled { background: var(--dim); cursor: not-allowed; }
+    .loading { text-align: center; padding: 26px 0; color: var(--muted); display: none; }
+    .spinner { display: inline-block; width: 32px; height: 32px; border: 2.5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading p { margin-top: 12px; font-size: .9rem; }
-
-    .error-box {
-      background: #fef2f2; border: 1px solid #fca5a5;
-      border-radius: 10px; padding: 14px 18px;
-      color: #b91c1c; font-size: .875rem; display: none; margin-bottom: 20px;
-    }
-
+    .loading p { margin-top: 11px; font-size: .87rem; }
+    .error-box { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--r-sm); padding: 12px 16px; color: #b91c1c; font-size: .85rem; display: none; margin-bottom: 16px; }
     .results { display: none; }
-    .results-title {
-      font-size: .75rem; font-weight: 700; color: #64748b;
-      text-transform: uppercase; letter-spacing: .07em; margin-bottom: 14px;
-    }
-
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
-    .stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 12px; text-align: center; }
+    .results.visible { display: block; animation: slideUp .32s ease both; }
+    @keyframes slideUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+    .results-title { font-size: .69rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; margin-bottom: 14px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 18px 12px; text-align: center; }
     .stat.good { border-color: #86efac; background: #f0fdf4; }
     .stat.warn { border-color: #fca5a5; background: #fef2f2; }
-    .stat-num { font-size: 1.75rem; font-weight: 800; color: #15803d; line-height: 1; }
+    .stat-num { font-size: 2rem; font-weight: 800; color: var(--accent); line-height: 1; }
     .stat-num.good { color: #16a34a; }
     .stat-num.warn { color: #dc2626; }
-    .stat-label { font-size: .75rem; color: #64748b; margin-top: 5px; line-height: 1.3; }
-
-    .alert { border-radius: 8px; padding: 12px 16px; font-size: .83rem; margin-bottom: 16px; }
+    .stat-label { font-size: .71rem; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+    .alert { border-radius: var(--r-sm); padding: 11px 15px; font-size: .83rem; margin-bottom: 12px; }
     .alert-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
     .alert-err  { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
-    .alert p { font-weight: 600; margin-bottom: 5px; }
+    .alert p { font-weight: 600; margin-bottom: 4px; }
     .alert ul { padding-left: 16px; }
     .alert li { margin-top: 2px; }
-
     .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-    thead tr { background: #f1f5f9; }
+    table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+    thead tr { background: var(--border-s); }
     th { padding: 8px 14px; text-align: left; font-weight: 600; color: #475569; white-space: nowrap; }
-    td { padding: 7px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    td { padding: 7px 14px; border-bottom: 1px solid var(--border-s); color: var(--body); }
     tbody tr:last-child td { border-bottom: none; }
     td:first-child { font-weight: 600; }
-
-    .day-tab {
-      padding: 6px 16px; border: 1.5px solid #bbf7d0; border-radius: 6px;
-      background: #fff; color: #15803d; font-size: .82rem; font-weight: 600;
-      cursor: pointer; transition: all .15s;
-    }
-    .day-tab.active { background: #15803d; color: #fff; border-color: #15803d; }
-    .day-tab:hover:not(.active) { background: #f0fdf4; }
-
+    #dayTabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 14px; }
+    .day-tab { padding: 8px 18px; border: none; background: transparent; color: var(--muted); font-size: .84rem; font-weight: 600; cursor: pointer; position: relative; transition: color .18s; font-family: inherit; }
+    .day-tab::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 2px; background: var(--accent); transform: scaleX(0); transition: transform .2s ease; }
+    .day-tab.active { color: var(--accent); }
+    .day-tab.active::after { transform: scaleX(1); }
+    .day-tab:hover:not(.active) { color: var(--text); }
     .tt-table { border-collapse: collapse; font-size: .78rem; min-width: 600px; }
-    .tt-table th { background: #15803d; color: #fff; padding: 7px 10px; text-align: center; white-space: nowrap; font-weight: 600; }
-    .tt-table th:first-child { text-align: left; background: #14532d; }
-    .tt-table td { border: 1px solid #e2e8f0; padding: 5px 8px; vertical-align: top; min-width: 110px; min-height: 48px; }
-    .tt-table tr:nth-child(even) td:first-child { background: #f8fafc; }
-    .tt-table td:first-child { font-weight: 600; color: #374151; background: #f8fafc; white-space: nowrap; font-size: .77rem; }
-    .cell-code  { font-weight: 700; font-size: .78rem; color: #1e293b; }
-    .cell-subj  { font-size: .72rem; color: #475569; margin-top: 1px; }
-    .cell-lec   { font-size: .7rem;  color: #64748b; margin-top: 2px; }
-    .cell-stu   { font-size: .65rem; color: #94a3b8; }
-    .slot-DAE101 { border-left: 3px solid #3b82f6; background: #eff6ff; }
-    .slot-DAE102 { border-left: 3px solid #10b981; background: #f0fdf4; }
-    .slot-DAE103 { border-left: 3px solid #f59e0b; background: #fffbeb; }
-    .slot-DAE106 { border-left: 3px solid #8b5cf6; background: #f5f3ff; }
-    .slot-DAE108 { border-left: 3px solid #ef4444; background: #fef2f2; }
-
-    .edited { outline: 2px solid #fbbf24 !important; background: #fffbeb !important; }
-    .drop-target { min-height: 48px; }
-    .drop-target.drag-over { background: #dcfce7 !important; outline: 2px dashed #16a34a; }
-    td[draggable="true"] { cursor: grab; }
+    .tt-table th { background: var(--accent); color: #fff; padding: 7px 10px; text-align: center; white-space: nowrap; font-weight: 600; }
+    .tt-table th:first-child { text-align: left; background: #14532d; width: 110px; }
+    .tt-table td { border: 1px solid var(--border); padding: 5px 8px; vertical-align: top; min-height: 54px; }
+    .tt-table tr:nth-child(odd)  td:first-child { background: var(--border-s); }
+    .tt-table tr:nth-child(even) td:first-child { background: #edf2f7; }
+    .tt-table td:first-child { font-weight: 600; color: #374151; white-space: nowrap; font-size: .75rem; }
+    .cell-code { font-weight: 700; font-size: .78rem; color: var(--text); }
+    .cell-subj { font-size: .71rem; color: #475569; margin-top: 2px; }
+    .cell-lec  { font-size: .69rem; color: var(--muted); margin-top: 3px; }
+    .cell-stu  { font-size: .64rem; color: var(--dim); margin-top: 1px; }
+    .slot-DAE101 { border-left: 5px solid #3b82f6; background: #f0f6ff; }
+    .slot-DAE102 { border-left: 5px solid #10b981; background: #f0fdf8; }
+    .slot-DAE103 { border-left: 5px solid #f59e0b; background: #fffcf0; }
+    .slot-DAE106 { border-left: 5px solid #8b5cf6; background: #f8f5ff; }
+    .slot-DAE108 { border-left: 5px solid #ef4444; background: #fff5f5; }
+    td[draggable="true"] { cursor: grab; transition: box-shadow .12s, transform .12s; }
+    td[draggable="true"]:hover { box-shadow: 0 3px 10px rgba(0,0,0,.13); transform: translateY(-1px); position: relative; z-index: 1; }
     td[draggable="true"]:active { cursor: grabbing; }
+    .edited { outline: 2px solid #fbbf24 !important; background: #fffbeb !important; }
+    .drop-target { min-height: 54px; }
+    .drop-target.drag-over { background: #dcfce7 !important; outline: 2px dashed var(--accent); }
     .cell-lec[contenteditable] { cursor: text; border-radius: 3px; padding: 1px 3px; min-width: 30px; display: inline-block; }
     .cell-lec[contenteditable]:hover { background: rgba(255,255,255,.7); }
-    .cell-lec[contenteditable]:focus { outline: 1px solid #16a34a; background: #fff; }
-    .edit-badge {
-      display: none; background: #fbbf24; color: #78350f;
-      border-radius: 12px; padding: 2px 10px; font-size: .73rem;
-      font-weight: 700; margin-left: 10px; vertical-align: middle;
-    }
-    .toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 8px;
-      font-size: .85rem; z-index: 999; pointer-events: none;
-      animation: fadeInOut 2.5s ease forwards;
-    }
-    @keyframes fadeInOut {
-      0%  { opacity:0; transform:translateX(-50%) translateY(8px); }
-      15% { opacity:1; transform:translateX(-50%) translateY(0); }
-      80% { opacity:1; }
-      100%{ opacity:0; }
-    }
-
-    .download-btn {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      width: 100%; padding: 13px 0;
-      background: #15803d; color: #fff;
-      border: none; border-radius: 9px;
-      font-size: .98rem; font-weight: 600; cursor: pointer;
-      text-decoration: none; margin-top: 22px; transition: background .15s;
-    }
+    .cell-lec[contenteditable]:focus { outline: 1px solid var(--accent); background: #fff; }
+    .edit-badge { display: none; background: #fbbf24; color: #78350f; border-radius: 12px; padding: 2px 10px; font-size: .7rem; font-weight: 700; margin-left: 10px; vertical-align: middle; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 10px 22px; border-radius: 8px; font-size: .84rem; z-index: 999; pointer-events: none; animation: fadeInOut 2.5s ease forwards; }
+    @keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(8px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0} }
+    .download-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 13px 0; background: var(--accent); color: #fff; border: none; border-radius: var(--r-sm); font-size: .96rem; font-weight: 600; cursor: pointer; text-decoration: none; margin-top: 20px; transition: background .15s; font-family: inherit; }
     .download-btn:hover { background: #166534; }
   </style>
 </head>
 <body>
 
 <div class="header">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
-      <h1>V4 全自動排班系統 <span style="font-size:.75rem;opacity:.6;font-weight:400;">Auto-Scheduler</span></h1>
+      <h1>V4 全自動排班系統 <span style="font-size:.73rem;opacity:.55;font-weight:400">Auto-Scheduler</span></h1>
       <p>Class list answer 可以留空 &nbsp;·&nbsp; 系統自動決定 Day / Time / Room / Lecturer</p>
     </div>
-    <a href="/" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
-       background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);
-       border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none;white-space:nowrap;">
+    <a href="/" style="display:inline-flex;align-items:center;gap:5px;padding:7px 15px;
+       background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);
+       border-radius:7px;font-size:.8rem;font-weight:600;text-decoration:none;white-space:nowrap">
       ← 返回 V3 Demo
     </a>
   </div>
@@ -188,11 +129,9 @@
 <div class="container">
 
   <!-- Instructions -->
-  <div class="card" style="border-left: 4px solid #16a34a; background: #f0fdf4;">
-    <div style="font-size:.8rem; font-weight:700; color:#15803d; text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">
-      使用說明 How to Use (V4)
-    </div>
-    <ul style="font-size:.875rem; color:#14532d; padding-left:18px; line-height:1.9;">
+  <div class="info-panel">
+    <div style="font-size:.73rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px">使用說明 How to Use (V4)</div>
+    <ul style="font-size:.84rem;color:#14532d;padding-left:18px;line-height:1.95">
       <li><strong>Class list answer 可以完全留空</strong> — 系統從頭自動排 Day / Time / Room</li>
       <li>在 <strong>Teacher Availability</strong> 填寫老師不可用時間（N = 不可用），其餘留空</li>
       <li>系統按優先次序排課：<strong>Mon → Tue → Thu → Wed → Fri</strong></li>
@@ -264,7 +203,7 @@
     <!-- Timetable Grid -->
     <div style="margin-top:28px">
       <div class="results-title">時間表 Timetable</div>
-      <div id="dayTabs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
+      <div id="dayTabs"></div>
       <div id="gridContainer" style="overflow-x:auto;"></div>
     </div>
 
@@ -292,7 +231,11 @@
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); setFile(e.dataTransfer.files[0]); });
 
-  function show(id, visible) { document.getElementById(id).style.display = visible ? 'block' : 'none'; }
+  function show(id, visible) {
+    const el = document.getElementById(id);
+    el.style.display = visible ? 'block' : 'none';
+    if (id === 'results') el.classList.toggle('visible', visible);
+  }
 
   async function generate() {
     if (!selectedFile) return;
