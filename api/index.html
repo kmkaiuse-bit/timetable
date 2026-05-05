@@ -410,8 +410,10 @@
 
     const unassigned = stats.unassigned || [];
     document.getElementById('unscheduledSection').innerHTML = unassigned.length > 0
-      ? `<div class="alert alert-warn"><p>⚠ 未能排班 Unscheduled (${unassigned.length})</p>
-           <ul>${unassigned.map(c=>`<li>${c}</li>`).join('')}</ul></div>` : '';
+      ? `<div class="alert alert-warn"><p>⚠ 未能分配 Lec1 — No eligible teacher (${unassigned.length})</p>
+           <ul>${unassigned.map(c=>`<li>${c}</li>`).join('')}</ul>
+           <p style="margin-top:6px;font-weight:400;font-size:.8rem">班別已有時間表，但找不到合資格老師。請檢查 Teacher load table 的 quota 或 Teacher Availability。</p>
+         </div>` : '';
 
     const dist = stats.centre_dist, allDays = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
     const usedDays = allDays.filter(d => Object.values(dist).some(c => c[d]));

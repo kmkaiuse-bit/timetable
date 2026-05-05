@@ -400,12 +400,53 @@ def _room_free(conn: sqlite3.Connection, room: str, day: str, slot: str) -> bool
     return row is None
 
 
+def _build_teacher_capacity(conn: sqlite3.Connection) -> dict:
+    """
+    Pre-compute max concurrent classes per (subject, day, start_time).
+    = number of teachers who can teach that subject and are not unavailable.
+    Called once at the start of auto_assign_schedule.
+    """
+    cap = {}
+    subjects = [r[0] for r in conn.execute(
+        "SELECT DISTINCT subject_code FROM teacher_subjects WHERE lec1_quota > 0")]
+    for subj in subjects:
+        for day in _DAY_PRIORITY:
+            for slot1, _ in _TIME_BLOCKS:
+                start = slot1.split(" - ")[0]
+                n = conn.execute("""
+                    SELECT COUNT(*) FROM teacher_subjects ts
+                    WHERE ts.subject_code = ? AND ts.lec1_quota > 0
+                      AND ts.teacher_id NOT IN (
+                          SELECT teacher_id FROM teacher_unavailability
+                          WHERE day = ? AND start_time = ?
+                      )
+                """, (subj, day, start)).fetchone()[0]
+                cap[(subj, day, start)] = n
+            # Also cover single slots
+            for slot in _SINGLE_SLOTS:
+                start = slot.split(" - ")[0]
+                if (subj, day, start) not in cap:
+                    n = conn.execute("""
+                        SELECT COUNT(*) FROM teacher_subjects ts
+                        WHERE ts.subject_code = ? AND ts.lec1_quota > 0
+                          AND ts.teacher_id NOT IN (
+                              SELECT teacher_id FROM teacher_unavailability
+                              WHERE day = ? AND start_time = ?
+                          )
+                    """, (subj, day, start)).fetchone()[0]
+                    cap[(subj, day, start)] = n
+    return cap
+
+
 def auto_assign_schedule(conn: sqlite3.Connection) -> int:
     """
     v4: auto-assign Day/Time/Room for every class.
-    Processes largest classes first (most constrained).
+    Checks teacher capacity per (subject, day, start_time) so same-subject
+    classes are spread across enough time slots to avoid Lec1 exhaustion.
     Returns count of classes that got a slot.
     """
+    from collections import defaultdict
+
     classes = conn.execute("""
         SELECT c.code, c.group_code, c.student_count, c.subject_code,
                sub.loading_hrs
@@ -414,12 +455,18 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
         ORDER BY c.student_count DESC, c.code ASC
     """).fetchall()
 
+    # Pre-build teacher capacity cache (50 queries, done once)
+    teacher_cap = _build_teacher_capacity(conn)
+    # Track how many same-subject classes already occupy each (day, start)
+    slot_used: dict = defaultdict(int)  # (subject, day, start) -> count
+
     count = 0
     for cls in classes:
         code     = cls["code"]
         group    = cls["group_code"]
         students = cls["student_count"]
         loading  = cls["loading_hrs"] or 4
+        subj     = cls["subject_code"]
 
         room = _pick_room(conn, group, students)
         if not room:
@@ -431,6 +478,11 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
         for day in _DAY_PRIORITY:
             if need_two:
                 for slot1, slot2 in _TIME_BLOCKS:
+                    start1 = slot1.split(" - ")[0]
+                    start2 = slot2.split(" - ")[0]
+                    cap = teacher_cap.get((subj, day, start1), 0)
+                    if slot_used[(subj, day, start1)] >= cap:
+                        continue  # more classes here than teachers can handle
                     if (_room_free(conn, room, day, slot1) and
                             _room_free(conn, room, day, slot2)):
                         conn.execute("""
@@ -438,17 +490,24 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
                                 (class_code, day, time1, time2, room_code)
                             VALUES (?,?,?,?,?)
                         """, (code, day, slot1, slot2, room))
+                        slot_used[(subj, day, start1)] += 1
+                        slot_used[(subj, day, start2)] += 1
                         count += 1
                         assigned = True
                         break
             else:
                 for slot in _SINGLE_SLOTS:
+                    start = slot.split(" - ")[0]
+                    cap = teacher_cap.get((subj, day, start), 0)
+                    if slot_used[(subj, day, start)] >= cap:
+                        continue
                     if _room_free(conn, room, day, slot):
                         conn.execute("""
                             INSERT OR REPLACE INTO schedule
                                 (class_code, day, time1, time2, room_code)
                             VALUES (?,?,?,NULL,?)
                         """, (code, day, slot, room))
+                        slot_used[(subj, day, start)] += 1
                         count += 1
                         assigned = True
                         break

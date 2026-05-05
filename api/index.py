@@ -38,14 +38,17 @@ def serve_ui(path):
 
 @app.route("/api/template")
 def download_template():
-    """Serve the Excel template for teachers to download and fill in."""
     path = os.path.join(_HERE, "template.xlsx")
-    return send_file(
-        path,
+    return send_file(path,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name="Planning for Timetable.xlsx",
-    )
+        as_attachment=True, download_name="Planning for Timetable.xlsx")
+
+@app.route("/api/template/v4")
+def download_template_v4():
+    path = os.path.join(_HERE, "template_v4.xlsx")
+    return send_file(path,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True, download_name="Planning for Timetable V4.xlsx")
 
 
 @app.route("/api/schedule", methods=["POST"])
