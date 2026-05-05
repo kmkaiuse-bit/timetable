@@ -290,8 +290,13 @@
            <ul>${stats.violations.map(v=>`<li>${v}</li>`).join('')}</ul></div>` : '';
     const ua = stats.unassigned || [];
     document.getElementById('unscheduledSection').innerHTML = ua.length > 0
-      ? `<div class="alert alert-warn"><p>⚠ 未能分配 Lec1 — No eligible teacher (${ua.length})</p>
-           <ul>${ua.map(c=>`<li>${c}</li>`).join('')}</ul>
+      ? `<div class="alert alert-warn">
+           <p>⚠ 未能分配 Lec1 — No eligible teacher (${ua.length})</p>
+           <ul>${ua.map(c => {
+             const r = state.results.find(x => x.class_code === c);
+             const subj = r ? ` <span style="font-weight:400;color:#92400e">${r.name_cn}／${r.name_en}</span>` : '';
+             return `<li><strong>${c}</strong>${subj}</li>`;
+           }).join('')}</ul>
            <p style="margin-top:6px;font-weight:400;font-size:.8rem">班別已有時間表，但找不到合資格老師。請調整 Teacher load table 的 quota。</p>
          </div>` : '';
     const dist = stats.centre_dist, allDays = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
