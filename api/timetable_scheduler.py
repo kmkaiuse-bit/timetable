@@ -1,19 +1,12 @@
 """
-timetable_scheduler.py  (v3 — SQLite in-memory engine)
-=======================================================
-Reads Planning for Timetable.xlsx, builds an in-memory SQLite database,
-runs a constraint-based scheduler, and writes Timetable_Output.xlsx.
+timetable_scheduler.py  (v4 — full auto-scheduler)
+====================================================
+v3: Day/Time/Room fixed from Class list answer → assigns Lec1/2/3 only.
+v4: Class list answer empty → auto-assigns Day/Time/Room/Lec1/2/3.
 
-New in v3:
-  - SQLite used as in-process query engine (no persistent file needed)
-  - Teacher Availability sheet supported (optional, default = all available)
-  - Same class-group → same room enforced
-  - Teacher unavailability respected
-  - Assumptions A still holds: Day/Time/Venue fixed from Class list answer
-
-Usage:
-    python timetable_scheduler.py
-    # or via web: POST /api/schedule with Excel file
+Both modes share the same SQLite engine and teacher-assignment logic.
+run_from_bytes()    → v3 (requires pre-filled Class list answer)
+run_v4_from_bytes() → v4 (auto-assigns when Class list answer is empty)
 """
 
 import os
@@ -100,6 +93,22 @@ _MARKER_TO_SLOT = {
     "1400": "1400 - 1600",  1400: "1400 - 1600",
     "1600": "1600 - 1800",  1600: "1600 - 1800",
 }
+
+# ─── v4 auto-scheduler constants ──────────────────────────────────────────────
+
+# Group prefix → room centre (only exceptions; everything else maps 1:1)
+_GROUP_CENTRE_ALIAS = {"CS": "CSW"}
+
+# Day preference order: Mon > Tue > Thu > Wed > Fri
+_DAY_PRIORITY = ["Monday", "Tuesday", "Thursday", "Wednesday", "Friday"]
+
+# 4-hour blocks (two consecutive 2h slots on the same day)
+_TIME_BLOCKS = [
+    ("0900 - 1100", "1100 - 1300"),
+    ("1400 - 1600", "1600 - 1800"),
+]
+
+_SINGLE_SLOTS = ["0900 - 1100", "1100 - 1300", "1400 - 1600", "1600 - 1800"]
 
 # ─── Database helpers ─────────────────────────────────────────────────────────
 
@@ -335,6 +344,119 @@ def assign_group_rooms(conn: sqlite3.Connection):
                 (group_code, room["code"]))
 
     conn.commit()
+
+
+# ─── Phase 2b: v4 auto-assign Day / Time / Room ───────────────────────────────
+
+def _group_to_room_centre(group_code: str) -> str:
+    """'CS1' → 'CSW',  'TW2' → 'TW',  etc."""
+    prefix = re.sub(r"\d+$", "", group_code)
+    return _GROUP_CENTRE_ALIAS.get(prefix, prefix)
+
+
+def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) -> Optional[str]:
+    """
+    Return the preferred room for a class group.
+    1. Exact match from group code  (TW2 → TW-TW2, CS1 → CSW-C1)
+    2. Largest room at home centre with enough seats
+    3. Any room with enough seats (last resort)
+    """
+    centre    = _group_to_room_centre(group_code)
+    num_match = re.search(r"\d+$", group_code)
+
+    if num_match:
+        num = num_match.group()
+        # Standard pattern: CENTRE - CENTREn
+        for candidate in (f"{centre} - {centre}{num}",
+                          f"{centre} - C{num}"):   # CSW - C1 style
+            row = conn.execute(
+                "SELECT code FROM rooms WHERE code = ?", (candidate,)).fetchone()
+            if row:
+                return row[0]
+
+    # Fallback: largest room at home centre
+    row = conn.execute("""
+        SELECT code FROM rooms
+        WHERE centre = ? AND capacity >= ?
+        ORDER BY capacity DESC LIMIT 1
+    """, (centre, student_count)).fetchone()
+    if row:
+        return row[0]
+
+    # Last resort: any room
+    row = conn.execute("""
+        SELECT code FROM rooms WHERE capacity >= ?
+        ORDER BY capacity ASC LIMIT 1
+    """, (student_count,)).fetchone()
+    return row[0] if row else None
+
+
+def _room_free(conn: sqlite3.Connection, room: str, day: str, slot: str) -> bool:
+    row = conn.execute("""
+        SELECT 1 FROM schedule
+        WHERE room_code = ? AND day = ? AND (time1 = ? OR time2 = ?)
+        LIMIT 1
+    """, (room, day, slot, slot)).fetchone()
+    return row is None
+
+
+def auto_assign_schedule(conn: sqlite3.Connection) -> int:
+    """
+    v4: auto-assign Day/Time/Room for every class.
+    Processes largest classes first (most constrained).
+    Returns count of classes that got a slot.
+    """
+    classes = conn.execute("""
+        SELECT c.code, c.group_code, c.student_count, c.subject_code,
+               sub.loading_hrs
+        FROM classes c
+        JOIN subjects sub ON sub.code = c.subject_code
+        ORDER BY c.student_count DESC, c.code ASC
+    """).fetchall()
+
+    count = 0
+    for cls in classes:
+        code     = cls["code"]
+        group    = cls["group_code"]
+        students = cls["student_count"]
+        loading  = cls["loading_hrs"] or 4
+
+        room = _pick_room(conn, group, students)
+        if not room:
+            continue
+
+        need_two = loading >= 4
+        assigned = False
+
+        for day in _DAY_PRIORITY:
+            if need_two:
+                for slot1, slot2 in _TIME_BLOCKS:
+                    if (_room_free(conn, room, day, slot1) and
+                            _room_free(conn, room, day, slot2)):
+                        conn.execute("""
+                            INSERT OR REPLACE INTO schedule
+                                (class_code, day, time1, time2, room_code)
+                            VALUES (?,?,?,?,?)
+                        """, (code, day, slot1, slot2, room))
+                        count += 1
+                        assigned = True
+                        break
+            else:
+                for slot in _SINGLE_SLOTS:
+                    if _room_free(conn, room, day, slot):
+                        conn.execute("""
+                            INSERT OR REPLACE INTO schedule
+                                (class_code, day, time1, time2, room_code)
+                            VALUES (?,?,?,NULL,?)
+                        """, (code, day, slot, room))
+                        count += 1
+                        assigned = True
+                        break
+            if assigned:
+                break
+
+    conn.commit()
+    return count
 
 
 # ─── Phase 3: Assign teachers ─────────────────────────────────────────────────
@@ -638,6 +760,36 @@ def run_from_bytes(excel_bytes: bytes) -> tuple:
     gc.collect()
 
     # ── Phase 2: WRITE (new clean workbook — no original formatting needed) ──
+    output_bytes = write_output_fast(results)
+    return output_bytes, stats
+
+
+def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
+    """
+    v4 entry point: auto-assigns Day/Time/Room when Class list answer is empty.
+    Falls back to v3 behaviour if Class list answer is already filled.
+    """
+    import gc
+    from io import BytesIO
+
+    wb_read = openpyxl.load_workbook(
+        BytesIO(excel_bytes), data_only=True, read_only=True)
+
+    conn, n_sched, n_unavail = build_db(wb_read)
+    wb_read.close()
+    del wb_read
+    gc.collect()
+
+    if n_sched == 0:
+        auto_assign_schedule(conn)
+    # else: Class list answer already filled → use existing schedule as-is
+
+    unassigned = assign_teachers(conn)
+    results    = collect_results(conn)
+    stats      = collect_stats(conn, results, unassigned)
+    del conn
+    gc.collect()
+
     output_bytes = write_output_fast(results)
     return output_bytes, stats
 

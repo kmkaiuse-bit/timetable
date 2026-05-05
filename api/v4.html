@@ -3,27 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>課程時間表排班系統</title>
+  <title>V4 全自動排班系統</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", sans-serif;
-      background: #f0f4fb;
+      background: #f0fdf4;
       color: #1e293b;
       min-height: 100vh;
     }
 
-    /* ── Header ── */
     .header {
-      background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+      background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
       color: #fff;
       padding: 28px 40px;
-      box-shadow: 0 2px 8px rgba(30,64,175,.3);
+      box-shadow: 0 2px 8px rgba(21,128,61,.3);
     }
     .header h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; }
     .header p  { font-size: .875rem; opacity: .75; margin-top: 5px; }
 
-    /* ── Layout ── */
     .container { max-width: 960px; margin: 36px auto; padding: 0 20px 60px; }
 
     .card {
@@ -34,9 +32,8 @@
       margin-bottom: 20px;
     }
 
-    /* ── Drop zone ── */
     .drop-zone {
-      border: 2px dashed #c7d2fe;
+      border: 2px dashed #bbf7d0;
       border-radius: 10px;
       padding: 36px 24px;
       text-align: center;
@@ -44,55 +41,43 @@
       transition: border-color .15s, background .15s;
       user-select: none;
     }
-    .drop-zone:hover, .drop-zone.drag-over {
-      border-color: #3b82f6;
-      background: #eff6ff;
-    }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: #16a34a; background: #f0fdf4; }
     .drop-zone .icon { font-size: 2.4rem; margin-bottom: 10px; }
     .drop-zone .hint { color: #64748b; font-size: .9rem; line-height: 1.5; }
-    .drop-zone .hint strong { color: #1e40af; }
+    .drop-zone .hint strong { color: #15803d; }
     .file-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      margin-top: 14px; background: #eff6ff; color: #1d4ed8;
+      margin-top: 14px; background: #f0fdf4; color: #15803d;
       border-radius: 6px; padding: 6px 14px; font-size: .83rem; font-weight: 600;
     }
 
-    /* ── Button ── */
     .btn {
       width: 100%; padding: 13px 0;
-      background: #1e40af; color: #fff;
+      background: #15803d; color: #fff;
       border: none; border-radius: 9px;
       font-size: .98rem; font-weight: 600; cursor: pointer;
       margin-top: 18px; letter-spacing: .01em;
       transition: background .15s, transform .1s;
     }
-    .btn:hover:not(:disabled) { background: #1d4ed8; }
+    .btn:hover:not(:disabled) { background: #16a34a; }
     .btn:active:not(:disabled) { transform: scale(.99); }
     .btn:disabled { background: #94a3b8; cursor: not-allowed; }
 
-    /* ── Loading ── */
-    .loading {
-      text-align: center; padding: 28px 0;
-      color: #64748b; display: none;
-    }
+    .loading { text-align: center; padding: 28px 0; color: #64748b; display: none; }
     .spinner {
       display: inline-block; width: 34px; height: 34px;
-      border: 3px solid #e2e8f0; border-top-color: #1e40af;
-      border-radius: 50%;
-      animation: spin .75s linear infinite;
+      border: 3px solid #e2e8f0; border-top-color: #15803d;
+      border-radius: 50%; animation: spin .75s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loading p { margin-top: 12px; font-size: .9rem; }
 
-    /* ── Error ── */
     .error-box {
       background: #fef2f2; border: 1px solid #fca5a5;
       border-radius: 10px; padding: 14px 18px;
-      color: #b91c1c; font-size: .875rem; display: none;
-      margin-bottom: 20px;
+      color: #b91c1c; font-size: .875rem; display: none; margin-bottom: 20px;
     }
 
-    /* ── Results ── */
     .results { display: none; }
     .results-title {
       font-size: .75rem; font-weight: 700; color: #64748b;
@@ -100,29 +85,21 @@
     }
 
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
-    .stat {
-      background: #f8fafc; border: 1px solid #e2e8f0;
-      border-radius: 10px; padding: 16px 12px; text-align: center;
-    }
+    .stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 12px; text-align: center; }
     .stat.good { border-color: #86efac; background: #f0fdf4; }
     .stat.warn { border-color: #fca5a5; background: #fef2f2; }
-    .stat-num { font-size: 1.75rem; font-weight: 800; color: #1e40af; line-height: 1; }
+    .stat-num { font-size: 1.75rem; font-weight: 800; color: #15803d; line-height: 1; }
     .stat-num.good { color: #16a34a; }
     .stat-num.warn { color: #dc2626; }
     .stat-label { font-size: .75rem; color: #64748b; margin-top: 5px; line-height: 1.3; }
 
-    /* ── Alert boxes ── */
-    .alert {
-      border-radius: 8px; padding: 12px 16px;
-      font-size: .83rem; margin-bottom: 16px;
-    }
+    .alert { border-radius: 8px; padding: 12px 16px; font-size: .83rem; margin-bottom: 16px; }
     .alert-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
     .alert-err  { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
     .alert p { font-weight: 600; margin-bottom: 5px; }
     .alert ul { padding-left: 16px; }
     .alert li { margin-top: 2px; }
 
-    /* ── Centre table ── */
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: .85rem; }
     thead tr { background: #f1f5f9; }
@@ -131,30 +108,20 @@
     tbody tr:last-child td { border-bottom: none; }
     td:first-child { font-weight: 600; }
 
-    /* ── Timetable grid ── */
     .day-tab {
-      padding: 6px 16px; border: 1.5px solid #c7d2fe; border-radius: 6px;
-      background: #fff; color: #1e40af; font-size: .82rem; font-weight: 600;
+      padding: 6px 16px; border: 1.5px solid #bbf7d0; border-radius: 6px;
+      background: #fff; color: #15803d; font-size: .82rem; font-weight: 600;
       cursor: pointer; transition: all .15s;
     }
-    .day-tab.active { background: #1e40af; color: #fff; border-color: #1e40af; }
-    .day-tab:hover:not(.active) { background: #eff6ff; }
+    .day-tab.active { background: #15803d; color: #fff; border-color: #15803d; }
+    .day-tab:hover:not(.active) { background: #f0fdf4; }
 
     .tt-table { border-collapse: collapse; font-size: .78rem; min-width: 600px; }
-    .tt-table th {
-      background: #1e40af; color: #fff; padding: 7px 10px;
-      text-align: center; white-space: nowrap; font-weight: 600;
-    }
-    .tt-table th:first-child { text-align: left; background: #1e3a8a; }
-    .tt-table td {
-      border: 1px solid #e2e8f0; padding: 5px 8px; vertical-align: top;
-      min-width: 110px; min-height: 48px;
-    }
+    .tt-table th { background: #15803d; color: #fff; padding: 7px 10px; text-align: center; white-space: nowrap; font-weight: 600; }
+    .tt-table th:first-child { text-align: left; background: #14532d; }
+    .tt-table td { border: 1px solid #e2e8f0; padding: 5px 8px; vertical-align: top; min-width: 110px; min-height: 48px; }
     .tt-table tr:nth-child(even) td:first-child { background: #f8fafc; }
-    .tt-table td:first-child {
-      font-weight: 600; color: #374151; background: #f8fafc;
-      white-space: nowrap; font-size: .77rem;
-    }
+    .tt-table td:first-child { font-weight: 600; color: #374151; background: #f8fafc; white-space: nowrap; font-size: .77rem; }
     .cell-code  { font-weight: 700; font-size: .78rem; color: #1e293b; }
     .cell-subj  { font-size: .72rem; color: #475569; margin-top: 1px; }
     .cell-lec   { font-size: .7rem;  color: #64748b; margin-top: 2px; }
@@ -165,17 +132,15 @@
     .slot-DAE106 { border-left: 3px solid #8b5cf6; background: #f5f3ff; }
     .slot-DAE108 { border-left: 3px solid #ef4444; background: #fef2f2; }
 
-    /* ── Download button ── */
     .download-btn {
       display: flex; align-items: center; justify-content: center; gap: 10px;
       width: 100%; padding: 13px 0;
-      background: #16a34a; color: #fff;
+      background: #15803d; color: #fff;
       border: none; border-radius: 9px;
       font-size: .98rem; font-weight: 600; cursor: pointer;
-      text-decoration: none; margin-top: 22px;
-      transition: background .15s;
+      text-decoration: none; margin-top: 22px; transition: background .15s;
     }
-    .download-btn:hover { background: #15803d; }
+    .download-btn:hover { background: #166534; }
   </style>
 </head>
 <body>
@@ -183,38 +148,30 @@
 <div class="header">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <div>
-      <h1>課程時間表排班系統 <span style="font-size:.75rem;opacity:.6;font-weight:400;">v3 · Demo</span></h1>
-      <p>Class list answer 需預先填寫 Day / Time / Room &nbsp;·&nbsp; 系統自動分配 Lecturer</p>
+      <h1>V4 全自動排班系統 <span style="font-size:.75rem;opacity:.6;font-weight:400;">Auto-Scheduler</span></h1>
+      <p>Class list answer 可以留空 &nbsp;·&nbsp; 系統自動決定 Day / Time / Room / Lecturer</p>
     </div>
-    <a href="/v4" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
+    <a href="/" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
        background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);
        border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none;white-space:nowrap;">
-      試用 V4 全自動排班 →
+      ← 返回 V3 Demo
     </a>
   </div>
 </div>
 
 <div class="container">
 
-  <!-- Instructions notice -->
-  <div class="card" style="border-left: 4px solid #3b82f6; background: #eff6ff;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <div style="font-size:.8rem; font-weight:700; color:#1e40af; text-transform:uppercase; letter-spacing:.06em;">
-        使用說明 How to Use
-      </div>
-      <a href="/api/template"
-         style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;
-                background:#1e40af;color:#fff;border-radius:7px;font-size:.8rem;
-                font-weight:600;text-decoration:none;white-space:nowrap;"
-         download="Planning for Timetable.xlsx">
-        ⬇ 下載 Template Excel
-      </a>
+  <!-- Instructions -->
+  <div class="card" style="border-left: 4px solid #16a34a; background: #f0fdf4;">
+    <div style="font-size:.8rem; font-weight:700; color:#15803d; text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">
+      使用說明 How to Use (V4)
     </div>
-    <ul style="font-size:.875rem; color:#1e3a8a; padding-left:18px; line-height:1.9;">
-      <li>下載 Template → 在 <strong>Teacher Availability</strong> 填寫不可用時間（N = 不可用）→ 上傳</li>
-      <li>如有老師或班別變動，先更新 <strong>Teacher load table</strong> 及 <strong>Class list answer</strong></li>
-      <li>系統自動分配 Lecturer 1（主教）及 Lecturer 2/3（後備）</li>
-      <li>下載後如需微調，直接在 Excel 修改 Lecturer 欄即可</li>
+    <ul style="font-size:.875rem; color:#14532d; padding-left:18px; line-height:1.9;">
+      <li><strong>Class list answer 可以完全留空</strong> — 系統從頭自動排 Day / Time / Room</li>
+      <li>在 <strong>Teacher Availability</strong> 填寫老師不可用時間（N = 不可用），其餘留空</li>
+      <li>系統按優先次序排課：<strong>Mon → Tue → Thu → Wed → Fri</strong></li>
+      <li>同一班別（group）自動使用同一課室；如課室已滿自動轉用後備課室</li>
+      <li>如 Class list answer 已填寫，系統沿用現有 Day/Time/Room（與 V3 相同）</li>
     </ul>
   </div>
 
@@ -232,14 +189,14 @@
     </div>
     <input type="file" id="fileInput" accept=".xlsx" style="display:none">
     <button class="btn" id="generateBtn" disabled>
-      ⚙ 生成時間表 &nbsp; Generate Timetable
+      ⚙ 全自動排班 &nbsp; Auto-Generate Timetable (V4)
     </button>
   </div>
 
   <!-- Loading -->
   <div class="loading" id="loading">
     <div class="spinner"></div>
-    <p>排班中，請稍候… &nbsp; Processing, please wait…</p>
+    <p>全自動排班中，請稍候… &nbsp; Auto-scheduling, please wait…</p>
   </div>
 
   <!-- Error -->
@@ -248,10 +205,9 @@
   <!-- Results -->
   <div class="results card" id="results">
 
-    <div class="results-title">排班結果 Scheduling Results (v3 · SQLite engine)</div>
+    <div class="results-title">排班結果 Scheduling Results (v4 · Full Auto-Scheduler)</div>
 
     <div class="stats-grid" id="statsGrid"></div>
-
     <div id="violationsSection"></div>
     <div id="unscheduledSection"></div>
 
@@ -263,16 +219,16 @@
       </table>
     </div>
 
-    <!-- Download button (prominent) -->
-    <a class="download-btn" id="downloadBtn" href="#" download="Timetable_Output.xlsx">
-      ⬇ &nbsp;下載 Excel &nbsp; Timetable_Output.xlsx
+    <a class="download-btn" id="downloadBtn" href="#" download="Timetable_V4_Output.xlsx">
+      ⬇ &nbsp;下載 Excel &nbsp; Timetable_V4_Output.xlsx
     </a>
 
     <div class="alert alert-warn" style="margin-top:14px">
-      <p>如需人手調整 Manual adjustments (if needed):</p>
+      <p>V4 排班結果僅供參考，建議確認以下項目：</p>
       <ul>
-        <li>個別老師安排 — 直接在 Excel 修改 Lecturer 欄</li>
-        <li>非標準開始時間（如 8:30）— 在 Class list answer 的 Time 欄調整</li>
+        <li>課室容量是否足夠（系統已按學生人數篩選）</li>
+        <li>老師分配是否合理（未能排班的班別請手動指定）</li>
+        <li>特殊時間安排請在 Excel 中手動調整</li>
       </ul>
     </div>
 
@@ -283,9 +239,9 @@
       <div id="gridContainer" style="overflow-x:auto;"></div>
     </div>
 
-  </div><!-- /results -->
+  </div>
 
-</div><!-- /container -->
+</div>
 
 <script>
   const dropZone    = document.getElementById('dropZone');
@@ -304,7 +260,6 @@
     generateBtn.disabled = false;
   }
 
-  // Wire up all events without inline onclick
   generateBtn.addEventListener('click', generate);
   dropZone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
@@ -332,7 +287,7 @@
     fd.append('file', selectedFile);
 
     try {
-      const res  = await fetch('/api/schedule', { method: 'POST', body: fd });
+      const res  = await fetch('/api/schedule/v4', { method: 'POST', body: fd });
       const data = await res.json();
       if (data.error) { showError(data.error); return; }
       renderResults(data.stats, data.file);
@@ -358,7 +313,6 @@
     const viol  = stats.violations.length;
     const pct   = stats.preferred_pct;
 
-    // Stats cards
     document.getElementById('statsGrid').innerHTML = `
       <div class="stat ${sched === total ? 'good' : 'warn'}">
         <div class="stat-num ${sched === total ? 'good' : 'warn'}">${sched}/${total}</div>
@@ -374,59 +328,42 @@
       </div>
     `;
 
-    // Violations list
     const vs = document.getElementById('violationsSection');
-    vs.innerHTML = stats.violations.length > 0
-      ? `<div class="alert alert-err">
-           <p>⚠ Violations (${stats.violations.length})</p>
-           <ul>${stats.violations.map(v => `<li>${v}</li>`).join('')}</ul>
-         </div>`
+    vs.innerHTML = viol > 0
+      ? `<div class="alert alert-err"><p>⚠ Violations (${viol})</p>
+           <ul>${stats.violations.map(v => `<li>${v}</li>`).join('')}</ul></div>`
       : '';
 
-    // Unscheduled list
-    const us = document.getElementById('unscheduledSection');
     const unassigned = stats.unassigned || [];
-    us.innerHTML = unassigned.length > 0
-      ? `<div class="alert alert-warn">
-           <p>⚠ 未能排班 Unscheduled (${unassigned.length})</p>
-           <ul>${unassigned.map(c => `<li>${c}</li>`).join('')}</ul>
-         </div>`
+    document.getElementById('unscheduledSection').innerHTML = unassigned.length > 0
+      ? `<div class="alert alert-warn"><p>⚠ 未能排班 Unscheduled (${unassigned.length})</p>
+           <ul>${unassigned.map(c => `<li>${c}</li>`).join('')}</ul></div>`
       : '';
 
-    // Centre distribution table
     const dist     = stats.centre_dist;
     const allDays  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
     const usedDays = allDays.filter(d => Object.values(dist).some(c => c[d]));
-
     document.getElementById('centreHead').innerHTML =
       '<th>Centre</th>' + usedDays.map(d => `<th>${d.slice(0,3)}</th>`).join('');
     document.getElementById('centreBody').innerHTML =
       Object.entries(dist).sort().map(([centre, dayCounts]) =>
-        `<tr><td>${centre}</td>${usedDays.map(d =>
-          `<td>${dayCounts[d] || ''}</td>`).join('')}</tr>`
+        `<tr><td>${centre}</td>${usedDays.map(d => `<td>${dayCounts[d] || ''}</td>`).join('')}</tr>`
       ).join('');
 
-    // Download link
     const bytes = Uint8Array.from(atob(fileB64), c => c.charCodeAt(0));
-    const blob  = new Blob([bytes], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-    document.getElementById('downloadBtn').href = URL.createObjectURL(blob);
+    document.getElementById('downloadBtn').href = URL.createObjectURL(
+      new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    );
 
-    // Timetable grid
     renderGrid(stats.timetable_grid || {});
-
     show('results', true);
   }
-
-  // ── Timetable grid ─────────────────────────────────────────────────────────
 
   const DAY_ORDER  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
   const SLOT_ORDER = ['0900 - 1100','1100 - 1300','1400 - 1600','1600 - 1800'];
   const SLOT_LBL   = {'0900 - 1100':'0900','1100 - 1300':'1100','1400 - 1600':'1400','1600 - 1800':'1600'};
   let _grid = {}, _activeDay = null;
 
-  // Event delegation for day tabs — no inline onclick needed
   document.getElementById('dayTabs').addEventListener('click', e => {
     const btn = e.target.closest('.day-tab');
     if (btn) selectDay(btn.dataset.day);
@@ -437,8 +374,6 @@
     const days = DAY_ORDER.filter(d => grid[d] && Object.keys(grid[d]).length);
     if (!days.length) return;
     _activeDay = _activeDay && grid[_activeDay] ? _activeDay : days[0];
-
-    // Use data-day attribute instead of inline onclick
     document.getElementById('dayTabs').innerHTML = days.map(d =>
       `<button class="day-tab${_activeDay===d?' active':''}" data-day="${d}">${d.slice(0,3)}</button>`
     ).join('');
