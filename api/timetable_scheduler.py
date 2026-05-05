@@ -102,10 +102,12 @@ _GROUP_CENTRE_ALIAS = {"CS": "CSW"}
 # Day preference order: Mon > Tue > Thu > Wed > Fri
 _DAY_PRIORITY = ["Monday", "Tuesday", "Thursday", "Wednesday", "Friday"]
 
-# 4-hour blocks (two consecutive 2h slots on the same day)
+# 4-hour blocks (two consecutive 2h slots on the same day).
+# Only non-overlapping blocks — the double-booking LIKE check would miss
+# overlaps between e.g. 0900-1100 and 1000-1200, causing ghost assignments.
 _TIME_BLOCKS = [
-    ("0900 - 1100", "1100 - 1300"),
-    ("1400 - 1600", "1600 - 1800"),
+    ("0900 - 1100", "1100 - 1300"),  # morning
+    ("1400 - 1600", "1600 - 1800"),  # afternoon
 ]
 
 _SINGLE_SLOTS = ["0900 - 1100", "1100 - 1300", "1400 - 1600", "1600 - 1800"]
@@ -441,9 +443,12 @@ def _build_teacher_capacity(conn: sqlite3.Connection) -> dict:
 def auto_assign_schedule(conn: sqlite3.Connection) -> int:
     """
     v4: auto-assign Day/Time/Room for every class.
-    Checks teacher capacity per (subject, day, start_time) so same-subject
-    classes are spread across enough time slots to avoid Lec1 exhaustion.
-    Returns count of classes that got a slot.
+
+    Two spreading mechanisms:
+    1. teacher_cap check: same-subject classes per time slot ≤ available teachers
+    2. Day rotation: Nth class of a subject starts from the Nth day in _DAY_PRIORITY,
+       so same-subject classes spread naturally across Mon/Tue/Thu/Wed/Fri instead
+       of all piling onto Monday.
     """
     from collections import defaultdict
 
@@ -455,10 +460,9 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
         ORDER BY c.student_count DESC, c.code ASC
     """).fetchall()
 
-    # Pre-build teacher capacity cache (50 queries, done once)
-    teacher_cap = _build_teacher_capacity(conn)
-    # Track how many same-subject classes already occupy each (day, start)
-    slot_used: dict = defaultdict(int)  # (subject, day, start) -> count
+    teacher_cap  = _build_teacher_capacity(conn)
+    slot_used: dict    = defaultdict(int)  # (subject, day, start) -> count
+    subj_day_offset: dict = defaultdict(int)  # subject -> next day rotation index
 
     count = 0
     for cls in classes:
@@ -472,17 +476,21 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
         if not room:
             continue
 
+        # Rotate day priority per subject so same-subject classes spread across days
+        offset   = subj_day_offset[subj]
+        day_order = (_DAY_PRIORITY[offset:] + _DAY_PRIORITY[:offset])
+
         need_two = loading >= 4
         assigned = False
 
-        for day in _DAY_PRIORITY:
+        for day in day_order:
             if need_two:
                 for slot1, slot2 in _TIME_BLOCKS:
                     start1 = slot1.split(" - ")[0]
                     start2 = slot2.split(" - ")[0]
                     cap = teacher_cap.get((subj, day, start1), 0)
                     if slot_used[(subj, day, start1)] >= cap:
-                        continue  # more classes here than teachers can handle
+                        continue
                     if (_room_free(conn, room, day, slot1) and
                             _room_free(conn, room, day, slot2)):
                         conn.execute("""
@@ -513,6 +521,10 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
                         break
             if assigned:
                 break
+
+        if assigned:
+            # Advance this subject's day offset so the next class starts from the next day
+            subj_day_offset[subj] = (offset + 1) % len(_DAY_PRIORITY)
 
     conn.commit()
     return count
