@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.pyo
+Timetable_Output.xlsx
+.claude/
