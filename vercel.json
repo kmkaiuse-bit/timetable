@@ -1,6 +1,16 @@
 {
   "builds": [
-    { "src": "api/index.py", "use": "@vercel/python" }
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": [
+          "public/**",
+          "timetable_scheduler.py",
+          "db/schema.sql"
+        ]
+      }
+    }
   ],
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }

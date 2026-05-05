@@ -16,10 +16,24 @@ app = Flask(__name__, static_folder=_PUBLIC)
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_ui(path):
-    """Serve static UI files (for local dev; Vercel serves public/ directly)."""
-    if path and os.path.exists(os.path.join(_PUBLIC, path)):
-        return send_from_directory(_PUBLIC, path)
-    return send_from_directory(_PUBLIC, "index.html")
+    # Try exact file first (e.g. CSS, JS assets)
+    if path:
+        full = os.path.join(_PUBLIC, path)
+        if os.path.isfile(full):
+            return send_from_directory(_PUBLIC, path)
+
+    # Serve index.html for all other routes
+    html = os.path.join(_PUBLIC, "index.html")
+    if os.path.isfile(html):
+        with open(html, encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+    # Last resort: debug info
+    return (
+        f"<pre>public dir: {_PUBLIC}\n"
+        f"exists: {os.path.isdir(_PUBLIC)}\n"
+        f"files: {os.listdir(_PUBLIC) if os.path.isdir(_PUBLIC) else 'N/A'}</pre>"
+    ), 404
 
 
 @app.route("/api/schedule", methods=["POST"])
