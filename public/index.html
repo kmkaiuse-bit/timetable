@@ -161,6 +161,8 @@
     <ul style="font-size:.875rem; color:#1e3a8a; padding-left:18px; line-height:1.9;">
       <li>上傳 <strong>Planning for Timetable.xlsx</strong>（包含已填好時間/課室的 Class list answer）</li>
       <li>如有老師變動，先更新 <strong>Teacher load table</strong> 再上傳</li>
+      <li>如老師有不可用時間，在 Excel 加一張 <strong>Teacher Availability</strong> sheet：<br>
+          <span style="font-size:.8rem;color:#3b82f6">欄位格式：Teacher | Mon 0900 | Mon 1100 | … | Fri 1600<br>填 <strong>N</strong> 表示該時段不可用，空白 = 可用</span></li>
       <li>系統自動分配 Lecturer 1（主教）及 Lecturer 2/3（後備）</li>
       <li>下載後如需調整個別老師安排，直接在 Excel 修改即可</li>
     </ul>
@@ -196,7 +198,7 @@
   <!-- Results -->
   <div class="results card" id="results">
 
-    <div class="results-title">排班結果 Scheduling Results</div>
+    <div class="results-title">排班結果 Scheduling Results (v3 · SQLite engine)</div>
 
     <div class="stats-grid" id="statsGrid"></div>
 
