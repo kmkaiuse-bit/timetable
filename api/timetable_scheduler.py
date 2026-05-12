@@ -739,7 +739,8 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
     exclude_safe  = exclude if exclude else [-1]
     quota_filter  = "AND ts.lec1_quota > 0" if use_quota else ""
 
-    # H4: exclude teachers at or above weekly session cap (skipped in overflow pass)
+    # H4: exclude teachers at or above weekly loading cap.
+    # 1 loading = 1 class assignment (regardless of 2hr or 4hr duration).
     if ignore_h4_cap:
         h4_filter = ""
         h4_params = []
@@ -749,7 +750,7 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
                 SELECT teacher1_id FROM schedule
                 WHERE teacher1_id IS NOT NULL
                 GROUP BY teacher1_id
-                HAVING SUM(CASE WHEN time2 IS NOT NULL THEN 2 ELSE 1 END) >= ?
+                HAVING COUNT(*) >= ?
             )
         """
         h4_params = [_TEACHER_WEEKLY_SESSION_CAP]

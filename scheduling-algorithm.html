@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HKIT 排班算法 — 完整規則說明</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", sans-serif;
+    background: #f8fafc; color: #1e293b; line-height: 1.7; font-size: 15px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    color: #fff; padding: 56px 32px 48px; text-align: center;
+  }
+  .hero h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; }
+  .hero p  { font-size: 1rem; opacity: .7; margin-top: 8px; }
+  .hero .version {
+    display: inline-block; background: rgba(255,255,255,.15);
+    border-radius: 20px; padding: 4px 14px; font-size: .78rem;
+    font-weight: 700; margin-top: 14px; letter-spacing: .05em;
+  }
+
+  /* ── Nav ── */
+  .toc {
+    background: #fff; border-bottom: 1px solid #e2e8f0;
+    padding: 14px 32px; display: flex; gap: 6px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .toc a {
+    text-decoration: none; color: #1e40af; font-size: .8rem; font-weight: 600;
+    padding: 4px 12px; border-radius: 20px; border: 1px solid #c7d2fe;
+    transition: background .15s;
+  }
+  .toc a:hover { background: #eff6ff; }
+
+  /* ── Layout ── */
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px 100px; }
+  .section { margin-bottom: 64px; scroll-margin-top: 64px; }
+
+  /* ── Labels & headings ── */
+  .sec-label {
+    display: inline-block; background: #1e40af; color: #fff;
+    border-radius: 4px; padding: 2px 10px;
+    font-size: .7rem; font-weight: 700; letter-spacing: .08em; margin-bottom: 8px;
+  }
+  .sec-label.hard  { background: #dc2626; }
+  .sec-label.soft  { background: #d97706; }
+  .sec-label.warn  { background: #7c3aed; }
+  .sec-label.logic { background: #0f766e; }
+  h2 { font-size: 1.4rem; font-weight: 800; color: #0f172a; margin-bottom: 18px; }
+  h3 { font-size: .98rem; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+  p  { color: #334155; margin-bottom: 14px; }
+
+  /* ── Key message ── */
+  .key-msg {
+    background: #eff6ff; border-left: 5px solid #1e40af;
+    padding: 16px 22px; border-radius: 0 12px 12px 0;
+    font-size: 1rem; color: #1e3a8a; font-weight: 600; margin: 20px 0;
+  }
+
+  /* ── Constraint cards ── */
+  .constraint {
+    display: flex; gap: 16px; align-items: flex-start;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 10px;
+  }
+  .constraint.hard { border-left: 5px solid #dc2626; }
+  .constraint.soft { border-left: 5px solid #d97706; }
+  .constraint.warn { border-left: 5px solid #7c3aed; }
+  .c-icon { font-size: 1.6rem; flex-shrink: 0; line-height: 1.2; }
+  .c-body h3 { font-size: .92rem; font-weight: 700; margin-bottom: 4px; }
+  .c-body p  { font-size: .87rem; color: #475569; margin-bottom: 0; }
+  .c-body .tag {
+    display: inline-block; padding: 1px 8px; border-radius: 4px;
+    font-size: .7rem; font-weight: 700; margin-left: 6px; vertical-align: middle;
+  }
+  .tag-hard { background: #fee2e2; color: #dc2626; }
+  .tag-soft { background: #fef3c7; color: #b45309; }
+  .tag-warn { background: #ede9fe; color: #6d28d9; }
+
+  /* ── Step list ── */
+  .step-list { list-style: none; padding: 0; }
+  .step-list li {
+    display: flex; gap: 20px; padding: 20px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .step-list li:last-child { border-bottom: none; }
+  .step-num {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: #1e40af; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 1rem; flex-shrink: 0; margin-top: 3px;
+  }
+  .step-num.teal  { background: #0f766e; }
+  .step-num.red   { background: #dc2626; }
+  .step-num.amber { background: #d97706; }
+
+  /* ── Distance table ── */
+  table {
+    width: 100%; border-collapse: collapse; font-size: .88rem;
+    background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  }
+  th {
+    background: #1e40af; color: #fff; padding: 10px 14px;
+    text-align: left; font-size: .82rem; font-weight: 700;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .rank-badge {
+    display: inline-block; width: 26px; height: 26px; border-radius: 50%;
+    background: #1e40af; color: #fff; text-align: center;
+    line-height: 26px; font-size: .78rem; font-weight: 700;
+  }
+  .rank-badge.near { background: #15803d; }
+  .rank-badge.far  { background: #dc2626; }
+  .travel-chip {
+    display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: .75rem; font-weight: 700;
+  }
+  .t-near   { background: #dcfce7; color: #15803d; }
+  .t-mid    { background: #fef9c3; color: #92400e; }
+  .t-far    { background: #fee2e2; color: #dc2626; }
+
+  /* ── Time blocks ── */
+  .time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+  @media(max-width:580px){ .time-grid { grid-template-columns: 1fr; } }
+  .time-block {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 20px; text-align: center;
+  }
+  .time-block.tko { border-color: #fbbf24; background: #fffbeb; }
+  .time-block .t-label { font-size: .75rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+  .time-block .t-slots { font-size: 1.1rem; font-weight: 800; color: #1e40af; }
+  .time-block.tko .t-slots { color: #92400e; }
+  .time-block .t-note { font-size: .78rem; color: #94a3b8; margin-top: 4px; }
+
+  .slot-row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .slot { padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: .88rem; }
+  .slot.am { background: #dbeafe; color: #1e40af; }
+  .slot.pm { background: #d1fae5; color: #065f46; }
+  .slot-arrow { color: #94a3b8; font-size: 1.2rem; }
+
+  /* ── Flow diagram ── */
+  .flow { margin: 20px 0; }
+  .flow-step {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 14px 18px; margin-bottom: 6px; position: relative;
+  }
+  .flow-step::after {
+    content: "↓"; position: absolute; bottom: -18px; left: 28px;
+    color: #94a3b8; font-size: 1rem; font-weight: 700;
+  }
+  .flow-step:last-child::after { content: ""; }
+  .f-num {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #0f766e; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: .88rem; flex-shrink: 0;
+  }
+  .f-body h4 { font-size: .9rem; font-weight: 700; margin-bottom: 3px; }
+  .f-body p  { font-size: .83rem; color: #475569; margin-bottom: 0; }
+
+  /* ── Warning box ── */
+  .warn-box {
+    background: #fdf4ff; border: 1.5px solid #d8b4fe;
+    border-radius: 12px; padding: 18px 22px; margin: 16px 0;
+  }
+  .warn-box h3 { font-size: .92rem; color: #6d28d9; margin-bottom: 8px; }
+  .warn-box ul { list-style: none; padding: 0; }
+  .warn-box li { font-size: .86rem; color: #5b21b6; padding: 4px 0; }
+  .warn-box li::before { content: "⚠ "; }
+
+  .error-box {
+    background: #fff1f2; border: 1.5px solid #fca5a5;
+    border-radius: 12px; padding: 18px 22px; margin: 16px 0;
+  }
+  .error-box h3 { font-size: .92rem; color: #dc2626; margin-bottom: 8px; }
+  .error-box ul { list-style: none; padding: 0; }
+  .error-box li { font-size: .86rem; color: #991b1b; padding: 4px 0; }
+  .error-box li::before { content: "✗ "; font-weight: 700; }
+
+  .ok-box {
+    background: #f0fdf4; border: 1.5px solid #86efac;
+    border-radius: 12px; padding: 18px 22px; margin: 16px 0;
+  }
+  .ok-box h3 { font-size: .92rem; color: #15803d; margin-bottom: 8px; }
+  .ok-box ul { list-style: none; padding: 0; }
+  .ok-box li { font-size: .86rem; color: #166534; padding: 4px 0; }
+  .ok-box li::before { content: "✓ "; font-weight: 700; }
+
+  /* ── Legend ── */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: .82rem; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* ── Two col ── */
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+  @media(max-width:580px){ .cols2 { grid-template-columns: 1fr; } }
+
+  .mini-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px; font-size: .87rem;
+  }
+  .mini-card h4 { font-size: .88rem; font-weight: 700; margin-bottom: 8px; }
+  .mini-card ul { list-style: none; padding: 0; }
+  .mini-card li { padding: 3px 0; color: #475569; }
+  .mini-card li::before { content: "• "; color: #1e40af; }
+
+  hr.divider { border: none; border-top: 2px solid #e2e8f0; margin: 56px 0; }
+
+  /* ── Priority badge ── */
+  .priority-row { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+  .prio {
+    padding: 6px 16px; border-radius: 8px;
+    font-weight: 700; font-size: .85rem; display: flex; align-items: center; gap: 6px;
+  }
+  .prio-1 { background: #1e40af; color: #fff; }
+  .prio-2 { background: #2563eb; color: #fff; }
+  .prio-3 { background: #3b82f6; color: #fff; }
+  .prio-4 { background: #93c5fd; color: #1e3a8a; }
+  .prio-5 { background: #dbeafe; color: #1e3a8a; }
+  .prio-arrow { color: #94a3b8; font-size: 1.1rem; }
+
+  /* ── Combine illustration ── */
+  .combine-eg {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 20px; margin: 16px 0; font-size: .86rem;
+  }
+  .combine-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  .class-pill {
+    padding: 5px 14px; border-radius: 20px; font-weight: 700; font-size: .8rem;
+  }
+  .cp-ssp  { background: #dbeafe; color: #1e40af; }
+  .cp-wt   { background: #d1fae5; color: #065f46; }
+  .cp-kt   { background: #fef3c7; color: #92400e; }
+  .cp-combine { background: #0f766e; color: #fff; }
+  .combine-arrow { color: #94a3b8; font-size: 1rem; }
+
+  footer {
+    text-align: center; padding: 32px 0; border-top: 1.5px solid #e2e8f0;
+    color: #94a3b8; font-size: .83rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="version">V4 ALGORITHM SPEC · 2026</div>
+  <h1>HKIT 排班算法完整規則說明</h1>
+  <p>Constraints · Logic · Warnings · 處理優先次序</p>
+</div>
+
+<nav class="toc">
+  <a href="#overview">概覽</a>
+  <a href="#inputs">輸入資料</a>
+  <a href="#hard">Hard Constraints</a>
+  <a href="#soft">Soft Constraints</a>
+  <a href="#timeslots">時間段規則</a>
+  <a href="#centers">Center 距離</a>
+  <a href="#loading">Loading 計算</a>
+  <a href="#combine">CC Combine 邏輯</a>
+  <a href="#flow">排班流程</a>
+  <a href="#warnings">Warning 系統</a>
+</nav>
+
+<div class="page">
+
+
+  <!-- ══════════════════════════════════════════
+       OVERVIEW
+  ══════════════════════════════════════════ -->
+  <div class="section" id="overview">
+    <div class="sec-label">概覽</div>
+    <h2>系統目標</h2>
+
+    <div class="key-msg">
+      在滿足所有 Hard Constraints 的前提下，<br>
+      盡量符合 Soft Constraints，並對違規情況發出警告。
+    </div>
+
+    <div class="cols2">
+      <div class="mini-card">
+        <h4>🔴 Hard Constraints（不能違反）</h4>
+        <ul>
+          <li>同一老師不能同時教兩班</li>
+          <li>同一課室不能同時用兩班</li>
+          <li>學生上課地點必須符合報名</li>
+          <li>老師每週最多 6 節</li>
+          <li>CC combine：同科目 + 同語言</li>
+          <li>課室座位不能超出上限</li>
+          <li>時間段規則（TKO 特別時段）</li>
+          <li>老師同一天不能去兩個 center</li>
+          <li>學生同一天不能去兩個 center</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>🟡 Soft Constraints（盡量符合）</h4>
+        <ul>
+          <li>老師不可用時間偏好</li>
+          <li>不要天地堂（同半天 &gt;2hr 空）</li>
+          <li>CC combine 地點在最多學生 center</li>
+          <li>班別平均分佈至每天</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       INPUTS
+  ══════════════════════════════════════════ -->
+  <div class="section" id="inputs">
+    <div class="sec-label">輸入資料</div>
+    <h2>系統需要的資料</h2>
+
+    <table>
+      <tr>
+        <th>資料類型</th>
+        <th>必填</th>
+        <th>內容</th>
+      </tr>
+      <tr>
+        <td><strong>班別名單</strong></td>
+        <td>✅ 必填</td>
+        <td>班別代號、科目、每週節數、學生人數、報名 Campus（Core/Center）、語言（中/英）</td>
+      </tr>
+      <tr>
+        <td><strong>老師名單</strong></td>
+        <td>✅ 必填</td>
+        <td>老師姓名、可教科目、所屬 Center、最大 Loading（預設 6 節/週）</td>
+      </tr>
+      <tr>
+        <td><strong>課室名單</strong></td>
+        <td>✅ 必填</td>
+        <td>課室代號、所屬 Center、座位上限</td>
+      </tr>
+      <tr>
+        <td><strong>老師不可用時間</strong></td>
+        <td>⚪ 可選</td>
+        <td>哪位老師哪天哪個時段不許可上課（填 N）</td>
+      </tr>
+      <tr>
+        <td><strong>Center 分區對照</strong></td>
+        <td>✅ 必填</td>
+        <td>10 個 Center 代號及地區，用作 CC combine 地點選擇及走 center 評估</td>
+      </tr>
+    </table>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       HARD CONSTRAINTS
+  ══════════════════════════════════════════ -->
+  <div class="section" id="hard">
+    <div class="sec-label hard">Hard Constraints</div>
+    <h2>絕對不能違反的規則</h2>
+    <p>以下任何一條被違反，系統需拒絕該排班並重新嘗試或標記為「無法排班」。</p>
+
+    <div class="constraint hard">
+      <div class="c-icon">🚫</div>
+      <div class="c-body">
+        <h3>H1 · 老師不能同一時段教兩班 <span class="tag tag-hard">HARD</span></h3>
+        <p>同一老師在同一天同一時段只能有一個班別。Lec1/Lec2/Lec3 的衝突檢查只針對 Lec1（主教）。</p>
+      </div>
+    </div>
+
+    <div class="constraint hard">
+      <div class="c-icon">🏫</div>
+      <div class="c-body">
+        <h3>H2 · 課室同一時段只能用一班 <span class="tag tag-hard">HARD</span></h3>
+        <p>同一課室同一時段不能排兩個班，座位上限亦不能超出課室容量。</p>
+      </div>
+    </div>
+
+    <div class="constraint hard">
+      <div class="c-icon">📍</div>
+      <div class="c-body">
+        <h3>H3 · 學生上課地點必須符合報名 Campus <span class="tag tag-hard">HARD</span></h3>
+        <p>
+          <strong>Core 科目：</strong>上課地點 = 學生報名的 Campus（10 個 center 之一）。<br>
+          <strong>CC 科目：</strong>學生可去指定 combine 地點，但 combine 地點須在同類 center 範圍內（見 CC combine 邏輯）。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint hard">
+      <div class="c-icon">📊</div>
+      <div class="c-body">
+        <h3>H4 · 老師每週 Loading 上限 6 班 <span class="tag tag-hard">HARD</span></h3>
+        <p>
+          每位老師每週最多分配 <strong>6 班</strong>（以「班」計算，即 1 個 class assignment = 1 loading，不論該班係 2小時還是 4小時）。<br>
+          個別老師如有特別安排可個別設定。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint hard">
+      <div class="c-icon">🔗</div>
+      <div class="c-body">
+        <h3>H5 · CC Combine 條件：同科目 + 同語言 <span class="tag tag-hard">HARD</span></h3>
+        <p>CC 科目 combine 班時，只有「同科目代號」且「同授課語言（中文/英文）」的班別才能合併。</p>
+      </div>
+    </div>
+
+    <div class="constraint hard">
+      <div class="c-icon">🕙</div>
+      <div class="c-body">
+        <h3>H6 · TKO Center 特別時段 <span class="tag tag-hard">HARD</span></h3>
+        <p>
+          TKO Center 冷氣費用問題，上課時段必須為 <strong>10:00–14:00</strong> 或 <strong>15:00–19:00</strong>。<br>
+          不得排 09:00 開始的班（老師及學生均適用）。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint hard">
+      <div class="c-icon">👩‍🎓</div>
+      <div class="c-body">
+        <h3>H7 · 老師需具備教授該科目資格 <span class="tag tag-hard">HARD</span></h3>
+        <p>老師必須在 Teacher Load Table 中登記有該科目，且未超出個人 Loading 上限，才能被分配。</p>
+      </div>
+    </div>
+
+    <div class="constraint hard">
+      <div class="c-icon">🚷</div>
+      <div class="c-body">
+        <h3>H8 · 老師同一天不能去兩個 Center <span class="tag tag-hard">HARD</span></h3>
+        <p>
+          分配老師時，必須檢查：該老師當天是否已在另一個 Center 有課？<br>
+          如有，直接排除——不論兩個 Center 距離遠近，一律不允許。<br>
+          <strong>與舊 S3 的分別：</strong>由「盡量避免 + Warning」升級為「絕對不允許」。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint hard">
+      <div class="c-icon">🧑‍🎓</div>
+      <div class="c-body">
+        <h3>H9 · 學生同一天不能去兩個 Center <span class="tag tag-hard">HARD</span></h3>
+        <p>
+          排某班在 Center A、Day X 時，必須確保：該班所有學生當天沒有在另一個 Center B 的課。<br>
+          <strong>對 CC Combine 的影響：</strong>CC combine 班必須排在「所有相關學生當天沒有 Core 科在其他 Center」的日子。
+          如找不到符合條件的日子，才考慮調整 combine 地點（見 CC Combine 邏輯）。
+        </p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       SOFT CONSTRAINTS
+  ══════════════════════════════════════════ -->
+  <div class="section" id="soft">
+    <div class="sec-label soft">Soft Constraints</div>
+    <h2>盡量符合的規則</h2>
+    <p>違反後不會導致排班失敗，但系統應盡力避免，違反時發出相應警告。</p>
+
+    <div class="constraint soft">
+      <div class="c-icon">📅</div>
+      <div class="c-body">
+        <h3>S1 · 老師不可用時間偏好 <span class="tag tag-soft">SOFT</span></h3>
+        <p>
+          老師申報的不可用時段（例如：「星期一全天不許可」），系統排班時優先跳過。<br>
+          如所有其他時段均無法排班，系統需標記衝突並提示人手確認。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint soft">
+      <div class="c-icon">⏱️</div>
+      <div class="c-body">
+        <h3>S2 · 不要天地堂（同半天內空堂 &gt;2 小時）<span class="tag tag-soft">SOFT</span></h3>
+        <p>
+          <strong>適用對象：</strong>老師及學生均適用。<br>
+          <strong>定義：</strong>在同一半天（AM 或 PM block）內，兩節課之間的空堂超過 2 小時，即算天地堂。<br>
+          <strong>午飯時間不計：</strong>AM block 最後一節與 PM block 第一節之間的午飯時間不算天地堂。<br>
+          <strong>例外：</strong>如老師/學生只上半天，不需考慮天地堂。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint soft">
+      <div class="c-icon">⚖️</div>
+      <div class="c-body">
+        <h3>S3 · 班別平均分佈至每天（輪流發牌）<span class="tag tag-soft">SOFT</span></h3>
+        <p>
+          同一科目的多個班別，應平均分佈至週一至週五，避免某天老師/課室過度集中。<br>
+          使用「輪流發牌」算法：按班別序號輪流從不同日子開始排。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint soft">
+      <div class="c-icon">🏢</div>
+      <div class="c-body">
+        <h3>S4 · CC Combine 地點首選最多學生的 Center <span class="tag tag-soft">SOFT</span></h3>
+        <p>
+          CC 科目 combine 班時，優先選擇學生人數最多的 Center 作為上課地點。<br>
+          如人數相同（平局），以地區距離近者優先（見 Center 距離表）。<br>
+          <strong>但需受 H9 約束：</strong>如該 Center 會導致部分學生當天去兩個 Center，需調整地點或日子（見 CC Combine 邏輯）。
+        </p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       TIME SLOTS
+  ══════════════════════════════════════════ -->
+  <div class="section" id="timeslots">
+    <div class="sec-label logic">時間段規則</div>
+    <h2>上課時段設定</h2>
+
+    <div class="time-grid">
+      <div class="time-block">
+        <div class="t-label">所有 Center（除 TKO）</div>
+        <div class="t-slots">09:00 – 13:00 &nbsp;/&nbsp; 14:00 – 18:00</div>
+        <div class="t-note">AM block 及 PM block，各 4 小時</div>
+      </div>
+      <div class="time-block tko">
+        <div class="t-label">TKO 將軍澳（冷氣費用問題）</div>
+        <div class="t-slots">10:00 – 14:00 &nbsp;/&nbsp; 15:00 – 19:00</div>
+        <div class="t-note">⚠ 不可排 09:00 開始的班（老師+學生均適用）</div>
+      </div>
+    </div>
+
+    <p style="margin-top:8px">每個 block 分為 2 節連續課（每節 2 小時）：</p>
+
+    <div class="slot-row">
+      <div class="slot am">節 1：09:00–11:00</div>
+      <div class="slot-arrow">+</div>
+      <div class="slot am">節 2：11:00–13:00</div>
+      <div class="slot-arrow">=</div>
+      <div class="slot am">AM Block（上午）</div>
+    </div>
+    <div class="slot-row">
+      <div class="slot pm">節 3：14:00–16:00</div>
+      <div class="slot-arrow">+</div>
+      <div class="slot pm">節 4：16:00–18:00</div>
+      <div class="slot-arrow">=</div>
+      <div class="slot pm">PM Block（下午）</div>
+    </div>
+
+    <div class="warn-box" style="margin-top:18px">
+      <h3>天地堂判斷邏輯</h3>
+      <ul>
+        <li>AM block 內：節 1 後空堂 &gt;2hr 才到節 2 → 天地堂（但正常連排不會出現）</li>
+        <li>AM + 午飯 + PM：午飯時間不計入天地堂</li>
+        <li>AM block 內有班，PM block 內有班：正常，不算天地堂</li>
+        <li>AM block 只有節 1，PM block 只有節 4（中間空 5hrs）→ 算天地堂，發 Warning</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       CENTER DISTANCE
+  ══════════════════════════════════════════ -->
+  <div class="section" id="centers">
+    <div class="sec-label logic">Center 距離分析</div>
+    <h2>10 個 Center 距離排名（以 SSP/CSW 為核心）</h2>
+
+    <p>用於評估老師走 center 的風險，以及 CC combine 地點的「附近」判斷。</p>
+
+    <table>
+      <tr>
+        <th>排名</th>
+        <th>代號</th>
+        <th>地區</th>
+        <th>區域描述</th>
+        <th>估算 Travel Time</th>
+        <th>走 Center 風險</th>
+      </tr>
+      <tr>
+        <td><span class="rank-badge near">9</span></td>
+        <td><strong>SSP / CSW</strong></td>
+        <td>深水埗 / 長沙灣</td>
+        <td>核心區域，教室最密集</td>
+        <td><span class="travel-chip t-near">核心</span></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><span class="rank-badge near" style="background:#22c55e">8</span></td>
+        <td><strong>WT</strong></td>
+        <td>黃大仙</td>
+        <td>九龍中部偏東，最近鄰</td>
+        <td><span class="travel-chip t-near">~20 min</span></td>
+        <td>✅ 低風險</td>
+      </tr>
+      <tr>
+        <td><span class="rank-badge" style="background:#84cc16;color:#fff">7</span></td>
+        <td><strong>TS / TW</strong></td>
+        <td>青衣 / 荃灣</td>
+        <td>新界西入口，車程直接</td>
+        <td><span class="travel-chip t-near">~25 min</span></td>
+        <td>✅ 低風險</td>
+      </tr>
+      <tr>
+        <td><span class="rank-badge" style="background:#eab308;color:#fff">6</span></td>
+        <td><strong>ST</strong></td>
+        <td>沙田</td>
+        <td>經隧道後首站，中程</td>
+        <td><span class="travel-chip t-mid">~30 min</span></td>
+        <td>⚠ 中等風險</td>
+      </tr>
+      <tr>
+        <td><span class="rank-badge" style="background:#f97316;color:#fff">5</span></td>
+        <td><strong>SW</strong></td>
+        <td>上環</td>
+        <td>港島區，需過海</td>
+        <td><span class="travel-chip t-mid">~30 min</span></td>
+        <td>⚠ 中等風險</td>
+      </tr>
+      <tr>
+        <td><span class="rank-badge" style="background:#ef4444">4</span></td>
+        <td><strong>KT</strong></td>
+        <td>觀塘</td>
+        <td>九龍東端，需橫跨九龍</td>
+        <td><span class="travel-chip t-far">~35 min</span></td>
+        <td>🔴 高風險</td>
+      </tr>
+      <tr>
+        <td><span class="rank-badge far">3</span></td>
+        <td><strong>TKO</strong></td>
+        <td>將軍澳</td>
+        <td>九龍東延伸，偏遠</td>
+        <td><span class="travel-chip t-far">~45 min</span></td>
+        <td>🔴 高風險</td>
+      </tr>
+      <tr>
+        <td><span class="rank-badge far">2</span></td>
+        <td><strong>TM</strong></td>
+        <td>屯門</td>
+        <td>新界西偏遠</td>
+        <td><span class="travel-chip t-far">~60 min</span></td>
+        <td>🔴 極高風險</td>
+      </tr>
+      <tr>
+        <td><span class="rank-badge far">1</span></td>
+        <td><strong>FL</strong></td>
+        <td>粉嶺</td>
+        <td>新界北，最遠</td>
+        <td><span class="travel-chip t-far">~60 min</span></td>
+        <td>🔴 極高風險</td>
+      </tr>
+    </table>
+
+    <div class="cols2" style="margin-top:18px">
+      <div class="mini-card">
+        <h4>走 Center 判斷邏輯</h4>
+        <ul>
+          <li>排名差距 ≤2：低風險，≥2hr buffer 足夠</li>
+          <li>排名差距 3–4：中等風險，發 Warning</li>
+          <li>排名差距 ≥5：極高風險，強 Warning，建議人手審查</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>CC Combine「附近」定義</h4>
+        <ul>
+          <li>同一地區（排名差距 ≤1）：首選</li>
+          <li>排名差距 2–3：可接受</li>
+          <li>排名差距 ≥4：盡量避免，發 Warning</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       LOADING
+  ══════════════════════════════════════════ -->
+  <div class="section" id="loading">
+    <div class="sec-label logic">Loading 計算</div>
+    <h2>老師 Loading 規則</h2>
+
+    <div class="constraint hard">
+      <div class="c-icon">📊</div>
+      <div class="c-body">
+        <h3>每位老師每週最多 6 班（Hard）</h3>
+        <p>以「班」計算（1 class assignment = 1 loading），不論每班係 2小時還是 4小時。個別老師可設定不同上限。</p>
+      </div>
+    </div>
+
+    <div class="constraint soft">
+      <div class="c-icon">⚖️</div>
+      <div class="c-body">
+        <h3>Loading 盡量平均分佈（Soft）</h3>
+        <p>在不超出上限的前提下，系統盡量讓所有老師的 loading 接近平均，避免某位老師長期 0 節而另一位長期 6 節。</p>
+      </div>
+    </div>
+
+    <table style="margin-top:16px">
+      <tr>
+        <th>Loading 狀態</th>
+        <th>節數</th>
+        <th>處理方式</th>
+      </tr>
+      <tr>
+        <td>正常</td>
+        <td>1 – 5 班</td>
+        <td>正常分配</td>
+      </tr>
+      <tr>
+        <td>已達上限</td>
+        <td>6 班</td>
+        <td>不再分配新班，除非人手 override</td>
+      </tr>
+      <tr>
+        <td>空置</td>
+        <td>0 班</td>
+        <td>系統優先分配（避免老師長期閒置）</td>
+      </tr>
+      <tr>
+        <td>超出上限</td>
+        <td>&gt;6 班</td>
+        <td>只在找不到其他老師時才放寬（系統標記警告）</td>
+      </tr>
+    </table>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       CC COMBINE
+  ══════════════════════════════════════════ -->
+  <div class="section" id="combine">
+    <div class="sec-label logic">CC Combine 邏輯</div>
+    <h2>CC 科目合班規則</h2>
+
+    <p>CC（Community College）科目因每個 campus 報名人數可能不足成班，需要將多個 campus 的學生合併成一班上課。</p>
+
+    <h3 style="margin-top:20px;margin-bottom:12px">Combine 條件（必須同時符合）</h3>
+    <div class="constraint hard">
+      <div class="c-icon">📚</div>
+      <div class="c-body">
+        <h3>同科目代號 + 同授課語言（中文/英文）</h3>
+        <p>例如：CC_MKT101（英文）可以 combine；但 CC_MKT101（中文）與 CC_MKT101（英文）不能 combine。</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:20px;margin-bottom:12px">Combine 地點 + 日子選擇流程（受 H9 約束）</h3>
+
+    <div style="background:#eff6ff;border-left:4px solid #1e40af;padding:14px 18px;border-radius:0 10px 10px 0;margin-bottom:18px;font-size:.88rem;color:#1e3a8a;">
+      <strong>核心原則：</strong>先排 Core 科，再為 CC combine 班選日子。<br>
+      CC combine 班只能排在「所有相關學生當天不需去另一個 Center」的日子。
+    </div>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="f-num">1</div>
+        <div class="f-body">
+          <h4>統計各 Campus 學生人數，確定首選 Combine 地點</h4>
+          <p>人數最多的 Center 為首選。平局時選距 SSP/CSW 較近者。</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="f-num">2</div>
+        <div class="f-body">
+          <h4>【方法 A】搜尋符合 H9 的日子</h4>
+          <p>
+            在首選 Combine Center，找一個日子，使得所有 combine 學生當天的 Core 科也在同一 Center（或當天無 Core 科）。<br>
+            <strong>如找到 → 排定，完成。</strong>
+          </p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="f-num">3</div>
+        <div class="f-body">
+          <h4>【方法 B】調整 Combine 地點再搜尋</h4>
+          <p>
+            如方法 A 找不到合適日子，改以「次多學生」的 Center 作為 combine 地點，重複步驟 2。<br>
+            依此類推，逐個 Center 嘗試，直至找到可行方案。
+          </p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="f-num">4</div>
+        <div class="f-body">
+          <h4>確認課室容量</h4>
+          <p>確認目標 Center 在選定日子有足夠座位的課室可用（合計所有 combine 學生人數）。</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="f-num" style="background:#dc2626">!</div>
+        <div class="f-body">
+          <h4>所有方法均失敗 → 標記 ERROR，等候人手決定</h4>
+          <p>所有 Center 及所有日子均無法在不違反 H9 的情況下安排，系統發出 ERROR 並提示管理員人手處理。</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:24px;margin-bottom:12px">Combine 示例</h3>
+
+    <div class="combine-eg">
+      <p style="font-weight:700;margin-bottom:12px">科目：CC_MKT101（英文）</p>
+      <div class="combine-row">
+        <span class="class-pill cp-ssp">SSP Campus · 12 人</span>
+        <span class="combine-arrow">+</span>
+        <span class="class-pill cp-wt">WT Campus · 8 人</span>
+        <span class="combine-arrow">+</span>
+        <span class="class-pill cp-kt">KT Campus · 5 人</span>
+        <span class="combine-arrow">→</span>
+        <span class="class-pill cp-combine">合班於 SSP（最多人）· 共 25 人</span>
+      </div>
+      <p style="margin-top:12px;font-size:.84rem;color:#475569">
+        WT 及 KT 的學生需前往 SSP 上課。因屬 Combine 安排，不算「走 Center」違規，但系統仍會檢查天地堂。
+      </p>
+    </div>
+
+    <div class="warn-box">
+      <h3>Combine 特別注意</h3>
+      <ul>
+        <li>Combine 後的班別，需繼續遵守天地堂規則（S2）</li>
+        <li>非 Combine 班的學生去其他 Center 不算走 Center 違規</li>
+        <li>Combine 上課地點由系統建議，最終由 Programme Leader 確認</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       FLOW
+  ══════════════════════════════════════════ -->
+  <div class="section" id="flow">
+    <div class="sec-label logic">排班流程</div>
+    <h2>算法執行步驟</h2>
+
+    <ul class="step-list">
+      <li>
+        <div class="step-num">1</div>
+        <div>
+          <h3>讀取所有資料</h3>
+          <p>從 Excel 讀入班別、老師、課室、老師不可用時間、Center 分區對照表。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div>
+          <h3>預處理：CC Combine 分組</h3>
+          <p>
+            將所有 CC 科目，按「科目代號 + 語言」分組。<br>
+            每組計算各 Campus 人數，決定 combine 地點及合計人數，形成「combine 班別清單」。
+          </p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num teal">3</div>
+        <div>
+          <h3>排班優先次序</h3>
+          <p>按以下次序排班（先難後易）：</p>
+          <div class="priority-row">
+            <div class="prio prio-1">① 人數最多班別</div>
+            <span class="prio-arrow">→</span>
+            <div class="prio prio-2">② Core 科目</div>
+            <span class="prio-arrow">→</span>
+            <div class="prio prio-3">③ CC Combine 班</div>
+            <span class="prio-arrow">→</span>
+            <div class="prio prio-4">④ 一般班別</div>
+            <span class="prio-arrow">→</span>
+            <div class="prio prio-5">⑤ 剩餘班別</div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div>
+          <h3>為每班選擇時間段（輪流發牌）</h3>
+          <p>
+            按班別序號輪流從不同日子優先嘗試（Mon → Tue → Thu → Wed → Fri → 再從 Mon 開始）。<br>
+            確認該時段於指定 Center 有空置且合適的課室。<br>
+            檢查：是否違反 H6（TKO 時段）、是否會製造天地堂（S2）。
+          </p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">5</div>
+        <div>
+          <h3>選擇課室</h3>
+          <p>
+            <strong>首選：</strong>班別代號對應的課室（例如 DAE101_TW2 → TW-TW2）。<br>
+            <strong>次選：</strong>同 Center 內最大的空置課室（座位足夠）。<br>
+            <strong>最後：</strong>全 Center 範圍搜尋（跨 Center 課室，少見）。
+          </p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">6</div>
+        <div>
+          <h3>分配老師（Lec1）</h3>
+          <p>
+            條件（必須全部符合）：<br>
+            ① 教得該科 &nbsp;② 當天/時段可用（不可用時間偏好）&nbsp;③ 未超出 Loading 上限<br>
+            ④ <strong>該天未在另一個 Center 授課（H8）</strong><br><br>
+            找不到時：放寬 Loading 上限再搜尋 → 仍找不到：標記「未能分配老師」。<br>
+            注意：H8（不能走 center）不可放寬，此條為 Hard Constraint。
+          </p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">7</div>
+        <div>
+          <h3>分配後備老師（Lec2、Lec3）</h3>
+          <p>條件：教得該科 + 該時段無衝突（不需檢查 Loading 及 Center 限制）。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num teal">8</div>
+        <div>
+          <h3>執行所有 Warning 檢查</h3>
+          <p>完成排班後，逐一檢查 Soft Constraints，生成 Warning 清單（見下節）。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">9</div>
+        <div>
+          <h3>輸出結果</h3>
+          <p>
+            輸出 Excel 時間表 + Warning 清單 + 未能排班的班別清單，供人手審查及調整。
+          </p>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       WARNINGS
+  ══════════════════════════════════════════ -->
+  <div class="section" id="warnings">
+    <div class="sec-label warn">Warning 系統</div>
+    <h2>系統警告分類</h2>
+
+    <p>Warning 不會阻止排班輸出，但會在結果頁面及 Excel 中標示，提醒管理員人手審查。</p>
+
+    <div class="error-box">
+      <h3>🔴 錯誤（排班失敗，需人手介入）</h3>
+      <ul>
+        <li>找不到合適課室（座位不足或 Center 全滿）</li>
+        <li>找不到任何合資格老師（Lec1 無法分配）</li>
+        <li>CC Combine：所有 Center 及所有日子均違反 H9（學生當天要去兩個 Center）</li>
+        <li>CC Combine 地點確定後課室仍不足</li>
+        <li>老師在所有可用時段均已被 H8 阻擋（當天已在其他 Center 授課）</li>
+      </ul>
+    </div>
+
+    <div class="warn-box">
+      <h3>🟡 警告（排班完成，但需人手確認）</h3>
+      <ul>
+        <li>老師被分配到申報不可用的時段（S1 偏好被迫違反）</li>
+        <li>老師或學生出現天地堂（同半天空堂 &gt;2hr）</li>
+        <li>老師 Loading 超出 6 節（放寬後才分配到老師）</li>
+        <li>CC Combine 地點非首選（方法 B 介入，調整了 combine 地點）</li>
+        <li>CC Combine 地點距部分學生 Campus 較遠（排名差距 ≥4）</li>
+      </ul>
+    </div>
+
+    <div class="ok-box">
+      <h3>✅ 正常完成（無需人手介入）</h3>
+      <ul>
+        <li>所有班別均已成功排班</li>
+        <li>所有 Hard Constraints 均符合</li>
+        <li>所有 Lec1 成功分配</li>
+        <li>無天地堂、無走 Center 問題</li>
+      </ul>
+    </div>
+
+    <h3 style="margin-top:24px;margin-bottom:14px">Warning 優先次序顯示</h3>
+    <table>
+      <tr>
+        <th>級別</th>
+        <th>顏色</th>
+        <th>觸發條件</th>
+        <th>建議行動</th>
+      </tr>
+      <tr>
+        <td>🔴 ERROR</td>
+        <td>紅色</td>
+        <td>Hard Constraint 無法滿足</td>
+        <td>必須人手處理</td>
+      </tr>
+      <tr>
+        <td>🟠 STRONG WARNING</td>
+        <td>橙色</td>
+        <td>老師走遠 Center / Loading 超出</td>
+        <td>建議調整，需確認</td>
+      </tr>
+      <tr>
+        <td>🟡 WARNING</td>
+        <td>黃色</td>
+        <td>天地堂 / 老師偏好衝突</td>
+        <td>審閱後可接受</td>
+      </tr>
+      <tr>
+        <td>🟢 OK</td>
+        <td>綠色</td>
+        <td>完全符合所有規則</td>
+        <td>無需處理</td>
+      </tr>
+    </table>
+  </div>
+
+
+  <hr class="divider">
+
+  <footer>
+    HKIT 排班算法規則說明 &nbsp;·&nbsp; V4 &nbsp;·&nbsp; 2026年5月
+    &nbsp;·&nbsp; 如有問題請聯絡系統管理員
+  </footer>
+
+</div>
+</body>
+</html>
