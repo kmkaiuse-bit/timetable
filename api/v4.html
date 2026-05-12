@@ -455,8 +455,8 @@
 
 <script>
   function showPage(page) {
-    document.getElementById('schedulerPage').style.display = page === 'scheduler' ? '' : 'none';
-    document.getElementById('constraintPage').style.display = page === 'constraint' ? '' : 'none';
+    document.getElementById('schedulerPage').style.display  = page === 'scheduler'  ? 'block' : 'none';
+    document.getElementById('constraintPage').style.display = page === 'constraint' ? 'block' : 'none';
     document.getElementById('tabScheduler').classList.toggle('active', page === 'scheduler');
     document.getElementById('tabConstraint').classList.toggle('active', page === 'constraint');
   }
