@@ -28,7 +28,9 @@ def add_security_headers(response):
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_ui(path):
-    filename = "v4.html" if path.strip("/") == "v4" else "index.html"
+    # Serve v4.html for root and /v4; index.html only for explicit /v3
+    p = path.strip("/")
+    filename = "index.html" if p == "v3" else "v4.html"
     html = os.path.join(_HERE, filename)
     if os.path.isfile(html):
         with open(html, encoding="utf-8") as f:

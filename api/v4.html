@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>V4 全自動排班系統</title>
+  <title>HKIT 排班系統</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -108,6 +108,38 @@
     @keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(8px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0} }
     .download-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 13px 0; background: var(--accent); color: #fff; border: none; border-radius: var(--r-sm); font-size: .96rem; font-weight: 600; cursor: pointer; text-decoration: none; margin-top: 20px; transition: background .15s; font-family: inherit; }
     .download-btn:hover { background: #166534; }
+    /* ── Page nav tabs ── */
+    .nav-tabs { display: flex; gap: 4px; }
+    .nav-tab { padding: 7px 18px; border: none; background: rgba(255,255,255,.15); color: rgba(255,255,255,.75); border-radius: 7px; font-size: .83rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s; white-space: nowrap; }
+    .nav-tab.active { background: #fff; color: var(--accent); }
+    .nav-tab:hover:not(.active) { background: rgba(255,255,255,.25); color: #fff; }
+    /* ── Constraint page ── */
+    #constraintPage { display: none; }
+    .cp-section { background: #fff; border-radius: var(--r); padding: 26px 30px; box-shadow: var(--shadow); border: 1px solid var(--border-s); margin-bottom: 16px; }
+    .cp-section h2 { font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .cp-section h3 { font-size: .88rem; font-weight: 700; color: #0f172a; margin: 14px 0 6px; }
+    .cp-section p, .cp-section li { font-size: .87rem; color: #334155; line-height: 1.75; }
+    .cp-section ul { padding-left: 18px; }
+    .badge-hard { display: inline-block; background: #fee2e2; color: #dc2626; border-radius: 4px; padding: 1px 8px; font-size: .7rem; font-weight: 700; vertical-align: middle; margin-left: 4px; }
+    .badge-soft { display: inline-block; background: #fef3c7; color: #b45309; border-radius: 4px; padding: 1px 8px; font-size: .7rem; font-weight: 700; vertical-align: middle; margin-left: 4px; }
+    .badge-ok   { display: inline-block; background: #dcfce7; color: #15803d; border-radius: 4px; padding: 1px 8px; font-size: .7rem; font-weight: 700; vertical-align: middle; margin-left: 4px; }
+    .cause-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+    .cause-row:last-child { border-bottom: none; }
+    .cause-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .cause-body strong { display: block; font-size: .88rem; margin-bottom: 2px; }
+    .cause-body span { font-size: .82rem; color: #64748b; }
+    .cause-body em { font-size: .82rem; color: #15803d; font-style: normal; display: block; margin-top: 3px; }
+    .rule-table { width: 100%; border-collapse: collapse; font-size: .84rem; margin-top: 10px; }
+    .rule-table th { background: #f1f5f9; padding: 8px 12px; text-align: left; font-size: .78rem; color: #475569; font-weight: 700; }
+    .rule-table td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    .rule-table tr:last-child td { border-bottom: none; }
+    .time-block-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    .tb-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; text-align: center; }
+    .tb-card.tko { border-color: #fbbf24; background: #fffbeb; }
+    .tb-label { font-size: .72rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+    .tb-time { font-size: 1rem; font-weight: 800; color: #1e40af; }
+    .tb-card.tko .tb-time { color: #92400e; }
+    .tb-note { font-size: .75rem; color: #94a3b8; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -115,23 +147,23 @@
 <div class="header">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
-      <h1>V4 全自動排班系統 <span style="font-size:.73rem;opacity:.55;font-weight:400">Auto-Scheduler</span></h1>
-      <p>Class list answer 可以留空 &nbsp;·&nbsp; 系統自動決定 Day / Time / Room / Lecturer</p>
+      <h1>HKIT 排班系統 <span style="font-size:.73rem;opacity:.55;font-weight:400">Auto-Scheduler V5</span></h1>
+      <p>全自動排班 &nbsp;·&nbsp; Day / Time / Room / Lecturer 自動分配</p>
     </div>
-    <a href="/" style="display:inline-flex;align-items:center;gap:5px;padding:7px 15px;
-       background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);
-       border-radius:7px;font-size:.8rem;font-weight:600;text-decoration:none;white-space:nowrap">
-      ← 返回 V3 Demo
-    </a>
+    <div class="nav-tabs">
+      <button class="nav-tab active" id="tabScheduler" onclick="showPage('scheduler')">📅 排班</button>
+      <button class="nav-tab" id="tabConstraint" onclick="showPage('constraint')">📋 排班規則說明</button>
+    </div>
   </div>
 </div>
 
+<div id="schedulerPage">
 <div class="container">
 
   <!-- Instructions -->
   <div class="info-panel">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
-      <span style="font-size:.73rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em">使用說明 How to Use (V4)</span>
+      <span style="font-size:.73rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em">使用說明 How to Use</span>
       <a href="/api/template/v4"
          style="display:inline-flex;align-items:center;gap:5px;padding:5px 13px;
                 background:var(--accent);color:#fff;border-radius:6px;font-size:.78rem;
@@ -139,11 +171,12 @@
          download="Planning for Timetable V4.xlsx">⬇ 下載 V4 Template</a>
     </div>
     <ul style="font-size:.84rem;color:#14532d;padding-left:18px;line-height:1.95">
-      <li><strong>Class list answer 可以完全留空</strong> — 系統從頭自動排 Day / Time / Room</li>
+      <li><strong>Class list answer 可以完全留空</strong> — 系統從頭自動排 Day / Time / Room / Lecturer</li>
       <li>在 <strong>Teacher Availability</strong> 填寫老師不可用時間（N = 不可用），其餘留空</li>
       <li>系統按優先次序排課：<strong>Mon → Tue → Thu → Wed → Fri</strong></li>
       <li>同一班別（group）自動使用同一課室；如課室已滿自動轉用後備課室</li>
-      <li>如 Class list answer 已填寫，系統沿用現有 Day/Time/Room（與 V3 相同）</li>
+      <li>老師每人每週最多 <strong>6 班</strong>；TKO 時段為 <strong>10:00–14:00 / 15:00–19:00</strong></li>
+      <li>如有「排不到老師」的班別，點擊右上角 <strong>排班規則說明</strong> 了解原因及解決方法</li>
     </ul>
   </div>
 
@@ -199,11 +232,12 @@
     </a>
 
     <div class="alert alert-warn" style="margin-top:14px">
-      <p>V4 排班結果僅供參考，建議確認以下項目：</p>
+      <p>排班結果建議確認以下項目：</p>
       <ul>
-        <li>課室容量是否足夠（系統已按學生人數篩選）</li>
-        <li>老師分配是否合理（未能排班的班別請手動指定）</li>
-        <li>特殊時間安排請在 Excel 中手動調整</li>
+        <li>「未能分配 Lec1」的班別 → 查看原因，或拖移到另一天再重新下載</li>
+        <li>「H4 警告」→ 某老師已超出每週 6 班上限，建議增加老師</li>
+        <li>「S1 警告」→ 老師被排入申報不可用的時段，需人手確認</li>
+        <li>如有疑問，點擊頁面頂部 <strong>排班規則說明</strong> 了解詳情</li>
       </ul>
     </div>
 
@@ -217,6 +251,216 @@
   </div>
 
 </div>
+</div><!-- /schedulerPage -->
+
+<!-- ══════════════════ CONSTRAINT PAGE ══════════════════ -->
+<div id="constraintPage">
+<div class="container">
+
+  <!-- ── Why scheduling fails ── -->
+  <div class="cp-section">
+    <h2>❌ 排不到老師？常見原因及解決方法</h2>
+    <p style="margin-bottom:14px;color:#64748b">當系統顯示「未能分配 Lec1」，代表找不到符合條件的老師教這個班。原因通常是以下其中一項：</p>
+
+    <div class="cause-row">
+      <div class="cause-icon">🗺️</div>
+      <div class="cause-body">
+        <strong>H8 · 老師當天已在另一個 Centre 教書</strong>
+        <span>例如：某老師早上在 CSW 教課，下午這班在 TW——系統不允許老師同一天去兩個 Centre。</span>
+        <em>解決方法：在下方時間表將這班拖移到另一天，令老師當天只需去一個 Centre。</em>
+      </div>
+    </div>
+    <div class="cause-row">
+      <div class="cause-icon">⏰</div>
+      <div class="cause-body">
+        <strong>H1 · 同一時段所有合資格老師都已有課</strong>
+        <span>例如：星期二 0900 同時有 5 班數學，但只有 4 位數學老師——第 5 班沒有老師可教。</span>
+        <em>解決方法：拖移此班到另一個時段，或在 Teacher Load Table 加多一位老師。</em>
+      </div>
+    </div>
+    <div class="cause-row">
+      <div class="cause-icon">📊</div>
+      <div class="cause-body">
+        <strong>H4 · 老師每週 Loading 已達上限（6班）</strong>
+        <span>每位老師每週最多教 6 班。如所有合資格老師均已達到上限，系統會放寬並發出警告。</span>
+        <em>解決方法：在 Teacher Load Table 增加老師或調高個別老師的班數上限。</em>
+      </div>
+    </div>
+    <div class="cause-row">
+      <div class="cause-icon">📋</div>
+      <div class="cause-body">
+        <strong>H7 · 沒有老師登記可以教這科</strong>
+        <span>Teacher Load Table 中沒有任何老師登記教授此科目，或登記的老師 Quota 全為 0。</span>
+        <em>解決方法：在 Teacher Load Table 為此科目加入老師並填寫 Quota。</em>
+      </div>
+    </div>
+    <div class="cause-row">
+      <div class="cause-icon">📖</div>
+      <div class="cause-body">
+        <strong>S1 · 老師被排入申報不可用的時段（警告）</strong>
+        <span>老師在 Teacher Availability 標記了 N，但系統找不到其他老師，只能安排他/她並發出警告。</span>
+        <em>解決方法：確認該老師是否真的不可用，或拖移班別到其他時段。</em>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── All rules ── -->
+  <div class="cp-section">
+    <h2>📜 排班規則一覽</h2>
+
+    <h3>🔴 Hard Rules — 絕對不能違反</h3>
+    <table class="rule-table">
+      <tr><th>編號</th><th>規則</th><th>說明</th></tr>
+      <tr>
+        <td><strong>H1</strong></td>
+        <td>老師不能同一時段教兩班</td>
+        <td>同一時間同一位老師只能教一班</td>
+      </tr>
+      <tr>
+        <td><strong>H2</strong></td>
+        <td>課室同一時段只能用一班</td>
+        <td>座位亦不能超出課室上限</td>
+      </tr>
+      <tr>
+        <td><strong>H3</strong></td>
+        <td>學生上課地點須符合報名 Campus</td>
+        <td>報名 CSW 的學生，Core 科必須在 CSW 上課</td>
+      </tr>
+      <tr>
+        <td><strong>H4</strong></td>
+        <td>老師每週最多 6 班</td>
+        <td>1 loading = 1 班（無論 2小時或 4小時）</td>
+      </tr>
+      <tr>
+        <td><strong>H5</strong></td>
+        <td>CC Combine 須同科目 + 同語言</td>
+        <td>中文班與英文班不能 combine</td>
+      </tr>
+      <tr>
+        <td><strong>H6</strong></td>
+        <td>TKO Centre 特別時段</td>
+        <td>只可排 10:00–14:00 或 15:00–19:00（冷氣費問題）</td>
+      </tr>
+      <tr>
+        <td><strong>H7</strong></td>
+        <td>老師須具備教授資格</td>
+        <td>Teacher Load Table 有登記才能被分配</td>
+      </tr>
+      <tr>
+        <td><strong>H8</strong></td>
+        <td>老師同一天不能去兩個 Centre</td>
+        <td>例如早上 CSW、下午 TW = 不允許</td>
+      </tr>
+      <tr>
+        <td><strong>H9</strong></td>
+        <td>學生同一天不能去兩個 Centre</td>
+        <td>同一學生同日所有課須在同一 Centre</td>
+      </tr>
+    </table>
+
+    <h3 style="margin-top:20px">🟡 Soft Rules — 盡量符合，違反時系統發出警告</h3>
+    <table class="rule-table">
+      <tr><th>編號</th><th>規則</th><th>說明</th></tr>
+      <tr>
+        <td><strong>S1</strong></td>
+        <td>老師不可用時間偏好</td>
+        <td>Teacher Availability 填 N 的時段，系統優先跳過；萬不得已才排入並警告</td>
+      </tr>
+      <tr>
+        <td><strong>S2</strong></td>
+        <td>不要天地堂</td>
+        <td>同一半天（上午或下午）內，兩堂課之間不能有超過 2 小時空堂</td>
+      </tr>
+      <tr>
+        <td><strong>S3</strong></td>
+        <td>班別平均分佈到每天</td>
+        <td>同科目的班別輪流從 Mon→Tue→Thu→Wed→Fri 開始排，避免某天過份集中</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ── Time slots ── -->
+  <div class="cp-section">
+    <h2>🕘 上課時段規則</h2>
+    <div class="time-block-grid">
+      <div class="tb-card">
+        <div class="tb-label">所有 Centre（除 TKO）</div>
+        <div class="tb-time">09:00–13:00 &nbsp;/&nbsp; 14:00–18:00</div>
+        <div class="tb-note">上午 block 及下午 block，各 4 小時</div>
+        <div class="tb-note" style="margin-top:8px;font-size:.76rem;color:#334155">
+          節 1：09:00–11:00 &nbsp;+&nbsp; 節 2：11:00–13:00<br>
+          節 3：14:00–16:00 &nbsp;+&nbsp; 節 4：16:00–18:00
+        </div>
+      </div>
+      <div class="tb-card tko">
+        <div class="tb-label">TKO 將軍澳 ⚠</div>
+        <div class="tb-time">10:00–14:00 &nbsp;/&nbsp; 15:00–19:00</div>
+        <div class="tb-note">冷氣費問題，不可排 09:00 開始的班</div>
+        <div class="tb-note" style="margin-top:8px;font-size:.76rem;color:#334155">
+          節 1：10:00–12:00 &nbsp;+&nbsp; 節 2：12:00–14:00<br>
+          節 3：15:00–17:00 &nbsp;+&nbsp; 節 4：17:00–19:00
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Centre distances ── -->
+  <div class="cp-section">
+    <h2>🗺️ Centre 距離（以 SSP/CSW 為核心）</h2>
+    <p style="margin-bottom:12px;font-size:.84rem;color:#64748b">H8 規則：老師同一天不能去兩個 Centre。距離越遠，影響越大。</p>
+    <table class="rule-table">
+      <tr><th>距離</th><th>Centre</th><th>地區</th><th>估算交通時間</th></tr>
+      <tr><td><span class="badge-ok">最近</span></td><td><strong>SSP / CSW</strong></td><td>深水埗 / 長沙灣</td><td>核心</td></tr>
+      <tr><td></td><td><strong>WT</strong></td><td>黃大仙</td><td>~20 分鐘</td></tr>
+      <tr><td></td><td><strong>TS / TW</strong></td><td>青衣 / 荃灣</td><td>~25 分鐘</td></tr>
+      <tr><td></td><td><strong>ST</strong></td><td>沙田</td><td>~30 分鐘</td></tr>
+      <tr><td></td><td><strong>SW</strong></td><td>上環</td><td>~30 分鐘（需過海）</td></tr>
+      <tr><td></td><td><strong>KT</strong></td><td>觀塘</td><td>~35 分鐘</td></tr>
+      <tr><td></td><td><strong>TKO</strong></td><td>將軍澳</td><td>~45 分鐘</td></tr>
+      <tr><td></td><td><strong>TM</strong></td><td>屯門</td><td>~60 分鐘</td></tr>
+      <tr><td><span class="badge-hard">最遠</span></td><td><strong>FL</strong></td><td>粉嶺</td><td>~60 分鐘</td></tr>
+    </table>
+  </div>
+
+  <!-- ── Excel setup ── -->
+  <div class="cp-section">
+    <h2>📊 Excel 填寫指引</h2>
+    <table class="rule-table">
+      <tr><th>工作表</th><th>必填內容</th><th>備注</th></tr>
+      <tr>
+        <td><strong>Class list</strong></td>
+        <td>班別代號、科目、學生人數、Loading</td>
+        <td>Class list answer 可以留空，系統自動排</td>
+      </tr>
+      <tr>
+        <td><strong>Teacher load table</strong></td>
+        <td>老師姓名、可教科目及 Quota</td>
+        <td>Quota = 該老師每週最多教該科幾班</td>
+      </tr>
+      <tr>
+        <td><strong>Centre Room Allocation</strong></td>
+        <td>課室代號、Centre、座位數</td>
+        <td>座位數用作篩選課室，須準確填寫</td>
+      </tr>
+      <tr>
+        <td><strong>Teacher Availability</strong></td>
+        <td>N = 不可用（留空 = 可用）</td>
+        <td>可選填，不填則視所有時段均可用</td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+</div><!-- /constraintPage -->
+
+<script>
+  function showPage(page) {
+    document.getElementById('schedulerPage').style.display = page === 'scheduler' ? '' : 'none';
+    document.getElementById('constraintPage').style.display = page === 'constraint' ? '' : 'none';
+    document.getElementById('tabScheduler').classList.toggle('active', page === 'scheduler');
+    document.getElementById('tabConstraint').classList.toggle('active', page === 'constraint');
+  }
+</script>
 
 <script>
   const dropZone    = document.getElementById('dropZone');
