@@ -301,12 +301,33 @@
              <strong style="display:block;margin-bottom:4px">為什麼排不到老師？常見原因：</strong>
              <span>① 那個時段所有合資格老師都已在教其他班（時間衝突）<br>
              ② 老師的可教班數已達上限（Quota 用盡）<br>
-             ③ 沒有老師在 Teacher load table 登記可教這科</span>
+             ③ 老師當天已在另一個 Centre（H8 約束）<br>
+             ④ 沒有老師在 Teacher load table 登記可教這科</span>
              <strong style="display:block;margin-top:8px;margin-bottom:4px">解決方法：</strong>
              <span>• 在下方時間表拖移此班到另一時段，再重新下載<br>
              • 或在 Teacher load table 增加相關老師的 quota，重新上傳</span>
            </div>
          </div>` : '';
+    const warns = stats.warnings || [];
+    const warnsSection = document.getElementById('unscheduledSection');
+    if (warns.length > 0) {
+      const h4warns = warns.filter(w => w.reason.startsWith('H4'));
+      const s1warns = warns.filter(w => w.reason.startsWith('S1'));
+      let html = '';
+      if (h4warns.length > 0) {
+        html += `<div class="alert" style="background:#fffbeb;border:1.5px solid #fbbf24;border-radius:10px;padding:14px 18px;margin-top:10px">
+          <p style="font-weight:700;color:#92400e">⚠ H4：${h4warns.length} 位老師超出每週 6 節上限</p>
+          <ul style="font-size:.84rem;color:#78350f;margin-top:6px">${h4warns.map(w=>`<li><strong>${w.class}</strong> → ${w.teacher} (${w.day})</li>`).join('')}</ul>
+        </div>`;
+      }
+      if (s1warns.length > 0) {
+        html += `<div class="alert" style="background:#fdf4ff;border:1.5px solid #d8b4fe;border-radius:10px;padding:14px 18px;margin-top:10px">
+          <p style="font-weight:700;color:#6d28d9">⚠ S1：${s1warns.length} 位老師被排入不可用時段</p>
+          <ul style="font-size:.84rem;color:#5b21b6;margin-top:6px">${s1warns.map(w=>`<li><strong>${w.class}</strong> → ${w.teacher} (${w.day})</li>`).join('')}</ul>
+        </div>`;
+      }
+      warnsSection.insertAdjacentHTML('beforeend', html);
+    }
     const dist = stats.centre_dist, allDays = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
     const usedDays = allDays.filter(d => Object.values(dist).some(c => c[d]));
     document.getElementById('centreHead').innerHTML =

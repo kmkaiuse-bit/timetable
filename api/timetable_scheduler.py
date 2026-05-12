@@ -59,6 +59,7 @@ CREATE TABLE group_rooms (
 
 CREATE TABLE schedule (
     class_code TEXT PRIMARY KEY,
+    group_code TEXT,
     day TEXT, time1 TEXT, time2 TEXT, room_code TEXT,
     teacher1_id INTEGER, teacher2_id INTEGER, teacher3_id INTEGER);
 """
@@ -97,7 +98,9 @@ _MARKER_TO_SLOT = {
 # ─── v4 auto-scheduler constants ──────────────────────────────────────────────
 
 # Group prefix → room centre (only exceptions; everything else maps 1:1)
-_GROUP_CENTRE_ALIAS = {"CS": "CSW"}
+# TK → TKO fixes the latent bug where _pick_room looked for centre 'TK'
+# but all TKO rooms are stored as centre 'TKO'.
+_GROUP_CENTRE_ALIAS = {"CS": "CSW", "TK": "TKO"}
 
 # Day preference order: Mon > Tue > Thu > Wed > Fri
 _DAY_PRIORITY = ["Monday", "Tuesday", "Thursday", "Wednesday", "Friday"]
@@ -111,6 +114,45 @@ _TIME_BLOCKS = [
 ]
 
 _SINGLE_SLOTS = ["0900 - 1100", "1100 - 1300", "1400 - 1600", "1600 - 1800"]
+
+# H6: TKO air-con cost — only allowed 10:00–14:00 or 15:00–19:00
+_TKO_TIME_BLOCKS = [
+    ("1000 - 1200", "1200 - 1400"),  # morning
+    ("1500 - 1700", "1700 - 1900"),  # afternoon
+]
+_TKO_SINGLE_SLOTS = ["1000 - 1200", "1200 - 1400", "1500 - 1700", "1700 - 1900"]
+
+# H4: teacher weekly session cap (1 session = 1 × 2-hour slot)
+_TEACHER_WEEKLY_SESSION_CAP = 6
+
+# Centre distance rank from SSP/CSW core (higher = closer)
+# Used for S4 CC Combine tie-breaking and travel risk assessment
+_CENTRE_RANK = {
+    "SSP": 9, "CSW": 9,
+    "WT":  8,
+    "TS":  7, "TW": 7,
+    "ST":  6,
+    "SW":  5,
+    "KT":  4,
+    "TKO": 3,
+    "TM":  2,
+    "FL":  1,
+}
+
+# Slot order within the day (for S2 天地堂 check)
+_SLOT_HALF_DAY = {
+    "0900 - 1100": "AM", "1000 - 1200": "AM",
+    "1100 - 1300": "AM", "1200 - 1400": "AM",
+    "1400 - 1600": "PM", "1500 - 1700": "PM",
+    "1600 - 1800": "PM", "1700 - 1900": "PM",
+}
+# Numeric position within the day for gap calculation
+_SLOT_START_HOUR = {
+    "0900 - 1100": 9,  "1000 - 1200": 10,
+    "1100 - 1300": 11, "1200 - 1400": 12,
+    "1400 - 1600": 14, "1500 - 1700": 15,
+    "1600 - 1800": 16, "1700 - 1900": 17,
+}
 
 # ─── Database helpers ─────────────────────────────────────────────────────────
 
@@ -290,11 +332,13 @@ def _load_existing_schedule(conn: sqlite3.Connection, wb):
         time2 = str(row[10]).strip() if row[10] else None
         venue = _resolve_venue(row[11]) if row[11] else None
 
+        code_str  = str(code).strip()
+        group_code = _extract_group(code_str)
         conn.execute("""
             INSERT OR REPLACE INTO schedule
-                (class_code, day, time1, time2, room_code)
-            VALUES (?,?,?,?,?)
-        """, (str(code).strip(), str(day).strip(), time1, time2, venue))
+                (class_code, group_code, day, time1, time2, room_code)
+            VALUES (?,?,?,?,?,?)
+        """, (code_str, group_code, str(day).strip(), time1, time2, venue))
         count += 1
     return count
 
@@ -406,15 +450,19 @@ def _build_teacher_capacity(conn: sqlite3.Connection) -> dict:
     """
     Pre-compute max concurrent classes per (subject, day, start_time).
     = number of teachers who can teach that subject and are not unavailable.
-    Called once at the start of auto_assign_schedule.
+    Covers both standard and TKO time slots.
     """
     cap = {}
     subjects = [r[0] for r in conn.execute(
         "SELECT DISTINCT subject_code FROM teacher_subjects WHERE lec1_quota > 0")]
+    all_blocks = _TIME_BLOCKS + _TKO_TIME_BLOCKS
+    all_slots  = _SINGLE_SLOTS + _TKO_SINGLE_SLOTS
     for subj in subjects:
         for day in _DAY_PRIORITY:
-            for slot1, _ in _TIME_BLOCKS:
+            for slot1, _ in all_blocks:
                 start = slot1.split(" - ")[0]
+                if (subj, day, start) in cap:
+                    continue
                 n = conn.execute("""
                     SELECT COUNT(*) FROM teacher_subjects ts
                     WHERE ts.subject_code = ? AND ts.lec1_quota > 0
@@ -424,8 +472,7 @@ def _build_teacher_capacity(conn: sqlite3.Connection) -> dict:
                       )
                 """, (subj, day, start)).fetchone()[0]
                 cap[(subj, day, start)] = n
-            # Also cover single slots
-            for slot in _SINGLE_SLOTS:
+            for slot in all_slots:
                 start = slot.split(" - ")[0]
                 if (subj, day, start) not in cap:
                     n = conn.execute("""
@@ -440,15 +487,34 @@ def _build_teacher_capacity(conn: sqlite3.Connection) -> dict:
     return cap
 
 
+def _has_tiandi_violation(group_slots: list, new_slot: str) -> bool:
+    """
+    S2: Returns True if adding new_slot creates a gap >2 hrs within the same
+    half-day (AM or PM). Lunch break (13:00-14:00) is not counted.
+    """
+    new_half  = _SLOT_HALF_DAY.get(new_slot)
+    new_start = _SLOT_START_HOUR.get(new_slot)
+    if new_half is None or new_start is None:
+        return False
+    for ex_slot in group_slots:
+        ex_half  = _SLOT_HALF_DAY.get(ex_slot)
+        ex_start = _SLOT_START_HOUR.get(ex_slot)
+        if ex_half != new_half or ex_start is None:
+            continue
+        if abs(new_start - ex_start) > 2:
+            return True
+    return False
+
+
 def auto_assign_schedule(conn: sqlite3.Connection) -> int:
     """
     v4: auto-assign Day/Time/Room for every class.
 
-    Two spreading mechanisms:
-    1. teacher_cap check: same-subject classes per time slot ≤ available teachers
-    2. Day rotation: Nth class of a subject starts from the Nth day in _DAY_PRIORITY,
-       so same-subject classes spread naturally across Mon/Tue/Thu/Wed/Fri instead
-       of all piling onto Monday.
+    Constraints enforced:
+    - H6: TKO uses 10:00-14:00 / 15:00-19:00 time slots only
+    - H9: A class group cannot appear at two different centres on the same day
+    - S2: No gap >2 hrs within same AM or PM half-day (no dead sessions)
+    - S3: Day rotation so same-subject classes spread across Mon-Fri
     """
     from collections import defaultdict
 
@@ -460,9 +526,11 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
         ORDER BY c.student_count DESC, c.code ASC
     """).fetchall()
 
-    teacher_cap  = _build_teacher_capacity(conn)
-    slot_used: dict    = defaultdict(int)  # (subject, day, start) -> count
-    subj_day_offset: dict = defaultdict(int)  # subject -> next day rotation index
+    teacher_cap      = _build_teacher_capacity(conn)
+    slot_used        = defaultdict(int)   # (subject, day, start) -> count
+    subj_day_offset  = defaultdict(int)   # subject -> next day rotation index
+    group_day_centre = {}                 # (group, day) -> centre  [H9]
+    group_day_slots  = defaultdict(list)  # (group, day) -> [slot, ...]  [S2]
 
     count = 0
     for cls in classes:
@@ -476,54 +544,79 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
         if not room:
             continue
 
-        # Rotate day priority per subject so same-subject classes spread across days
-        offset   = subj_day_offset[subj]
-        day_order = (_DAY_PRIORITY[offset:] + _DAY_PRIORITY[:offset])
+        # Derive room centre for H9 check
+        room_centre_row = conn.execute(
+            "SELECT centre FROM rooms WHERE code=?", (room,)).fetchone()
+        room_centre = room_centre_row[0] if room_centre_row else None
 
-        need_two = loading >= 4
-        assigned = False
+        # H6: TKO uses different time blocks
+        is_tko       = (room_centre == "TKO")
+        time_blocks  = _TKO_TIME_BLOCKS  if is_tko else _TIME_BLOCKS
+        single_slots = _TKO_SINGLE_SLOTS if is_tko else _SINGLE_SLOTS
+
+        offset    = subj_day_offset[subj]
+        day_order = _DAY_PRIORITY[offset:] + _DAY_PRIORITY[:offset]
+        need_two  = loading >= 4
+        assigned  = False
 
         for day in day_order:
+            # H9: skip day if group is already at a different centre
+            committed = group_day_centre.get((group, day))
+            if committed and room_centre and committed != room_centre:
+                continue
+
+            existing_slots = group_day_slots[(group, day)]
+
             if need_two:
-                for slot1, slot2 in _TIME_BLOCKS:
+                for slot1, slot2 in time_blocks:
                     start1 = slot1.split(" - ")[0]
                     start2 = slot2.split(" - ")[0]
                     cap = teacher_cap.get((subj, day, start1), 0)
                     if slot_used[(subj, day, start1)] >= cap:
                         continue
+                    # S2: 4-hr block occupies both AM or both PM slots consecutively
+                    if (_has_tiandi_violation(existing_slots, slot1) or
+                            _has_tiandi_violation(existing_slots, slot2)):
+                        continue
                     if (_room_free(conn, room, day, slot1) and
                             _room_free(conn, room, day, slot2)):
                         conn.execute("""
                             INSERT OR REPLACE INTO schedule
-                                (class_code, day, time1, time2, room_code)
-                            VALUES (?,?,?,?,?)
-                        """, (code, day, slot1, slot2, room))
+                                (class_code, group_code, day, time1, time2, room_code)
+                            VALUES (?,?,?,?,?,?)
+                        """, (code, group, day, slot1, slot2, room))
                         slot_used[(subj, day, start1)] += 1
                         slot_used[(subj, day, start2)] += 1
-                        count += 1
+                        group_day_centre[(group, day)] = room_centre
+                        group_day_slots[(group, day)].extend([slot1, slot2])
+                        count  += 1
                         assigned = True
                         break
             else:
-                for slot in _SINGLE_SLOTS:
+                for slot in single_slots:
                     start = slot.split(" - ")[0]
                     cap = teacher_cap.get((subj, day, start), 0)
                     if slot_used[(subj, day, start)] >= cap:
                         continue
+                    # S2: check adding this slot doesn't create a gap
+                    if _has_tiandi_violation(existing_slots, slot):
+                        continue
                     if _room_free(conn, room, day, slot):
                         conn.execute("""
                             INSERT OR REPLACE INTO schedule
-                                (class_code, day, time1, time2, room_code)
-                            VALUES (?,?,?,NULL,?)
-                        """, (code, day, slot, room))
+                                (class_code, group_code, day, time1, time2, room_code)
+                            VALUES (?,?,?,?,NULL,?)
+                        """, (code, group, day, slot, room))
                         slot_used[(subj, day, start)] += 1
-                        count += 1
+                        group_day_centre[(group, day)] = room_centre
+                        group_day_slots[(group, day)].append(slot)
+                        count  += 1
                         assigned = True
                         break
             if assigned:
                 break
 
         if assigned:
-            # Advance this subject's day offset so the next class starts from the next day
             subj_day_offset[subj] = (offset + 1) % len(_DAY_PRIORITY)
 
     conn.commit()
@@ -534,11 +627,19 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
 
 def assign_teachers(conn: sqlite3.Connection):
     """
-    Assign Lec1 (primary, respects quota + availability) and
-    Lec2/3 (backups, different person, no quota check).
+    Assign Lec1 (primary) and Lec2/3 (backups) to every scheduled class.
+
+    Four-pass Lec1 search:
+      Pass 1: quota + avail + H4 cap + H8 centre (fully strict)
+      Pass 2: quota relaxed, H4 + H8 still enforced
+      Pass 3: quota relaxed + H4 cap relaxed (→ H4_OVERLOAD warning), H8 still enforced
+      Pass 4: quota relaxed + H4 relaxed + avail ignored (→ S1 warning), H8 still enforced
+
+    Returns (unassigned_list, warnings_list).
+    warnings_list entries have keys: class, teacher, day, reason.
     """
     classes = conn.execute("""
-        SELECT s.class_code, c.subject_code, s.day, s.time1, s.time2
+        SELECT s.class_code, s.room_code, c.subject_code, s.day, s.time1, s.time2
         FROM schedule s
         JOIN classes c ON c.code = s.class_code
         WHERE s.day IS NOT NULL
@@ -546,32 +647,71 @@ def assign_teachers(conn: sqlite3.Connection):
     """).fetchall()
 
     unassigned = []
+    warnings   = []
 
     for cls in classes:
-        code, subj, day, time1, time2 = (
-            cls["class_code"], cls["subject_code"],
-            cls["day"], cls["time1"], cls["time2"])
+        code      = cls["class_code"]
+        subj      = cls["subject_code"]
+        day       = cls["day"]
+        time1     = cls["time1"]
+        time2     = cls["time2"]
+        room_code = cls["room_code"]
 
-        times = [t for t in [time1, time2] if t]
-        # Extract start-time token from slot string e.g. "0900 - 1100" → "0900"
+        # Derive room centre for H8
+        centre_row = conn.execute(
+            "SELECT centre FROM rooms WHERE code=?", (room_code,)
+        ).fetchone() if room_code else None
+        current_centre = centre_row[0] if centre_row else None
+
+        times  = [t for t in [time1, time2] if t]
         starts = [t.split(" - ")[0].strip() for t in times]
 
-        # ── Lec1: primary, respects quota, not double-booked, not unavailable ──
-        lec1 = _find_teacher(conn, subj, day, starts, exclude=[], use_quota=True)
+        warn_reason = None
+
+        # Pass 1: fully strict
+        lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
+                             use_quota=True, current_centre=current_centre)
+        # Pass 2: relax subject quota
+        if not lec1:
+            lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
+                                 use_quota=False, current_centre=current_centre)
+        # Pass 3: relax H4 weekly cap (overflow warning)
+        if not lec1:
+            lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
+                                 use_quota=False, current_centre=current_centre,
+                                 ignore_h4_cap=True)
+            if lec1:
+                warn_reason = "H4: teacher assigned beyond 6-session weekly cap"
+        # Pass 4: ignore unavailability (S1 forced)
+        if not lec1:
+            lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
+                                 use_quota=False, current_centre=current_centre,
+                                 ignore_h4_cap=True, ignore_unavail=True)
+            if lec1:
+                warn_reason = "S1: teacher assigned to unavailable slot (cap also exceeded)"
+
         if not lec1:
             unassigned.append(code)
-            lec1 = _find_teacher(conn, subj, day, starts, exclude=[], use_quota=False)
+        elif warn_reason:
+            teacher_name = conn.execute(
+                "SELECT name FROM teachers WHERE id=?", (lec1,)).fetchone()
+            warnings.append({
+                "class":   code,
+                "teacher": teacher_name[0] if teacher_name else str(lec1),
+                "day":     day,
+                "reason":  warn_reason,
+            })
 
-        # ── Lec2, Lec3: backups, just pick different people ──
-        lec2 = _find_teacher(conn, subj, day, starts, exclude=[lec1], use_quota=False) if lec1 else None
-        lec3 = _find_teacher(conn, subj, day, starts, exclude=[lec1, lec2], use_quota=False) if lec2 else None
+        lec2 = _find_teacher(conn, subj, day, starts, exclude=[lec1],
+                             use_quota=False, ignore_h4_cap=True) if lec1 else None
+        lec3 = _find_teacher(conn, subj, day, starts, exclude=[lec1, lec2],
+                             use_quota=False) if lec2 else None
 
         conn.execute("""
             UPDATE schedule SET teacher1_id=?, teacher2_id=?, teacher3_id=?
             WHERE class_code=?
         """, (lec1, lec2, lec3, code))
 
-        # Decrement lec1 quota
         if lec1:
             conn.execute("""
                 UPDATE teacher_subjects SET lec1_quota = MAX(0, lec1_quota - 1)
@@ -579,31 +719,86 @@ def assign_teachers(conn: sqlite3.Connection):
             """, (lec1, subj))
 
     conn.commit()
-    return unassigned
+    return unassigned, warnings
 
 
-def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota):
+def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
+                  current_centre=None, ignore_unavail=False, ignore_h4_cap=False):
     """
     Find the best available teacher for a subject at given day/start_times.
-    exclude: list of teacher_ids to skip.
-    use_quota: if True, only consider teachers with lec1_quota > 0.
+
+    Parameters:
+      use_quota:      only consider teachers with lec1_quota > 0 (H7)
+      current_centre: exclude teachers already at a different centre today (H8)
+      ignore_unavail: skip unavailability filter (S1 forced fallback)
+      ignore_h4_cap:  skip weekly session cap filter (H4 overflow fallback)
+
+    Returns (teacher_id | None).
     """
-    placeholders = ",".join("?" * max(len(exclude), 1))
-    exclude_safe = exclude if exclude else [-1]
+    placeholders  = ",".join("?" * max(len(exclude), 1))
+    exclude_safe  = exclude if exclude else [-1]
+    quota_filter  = "AND ts.lec1_quota > 0" if use_quota else ""
 
-    quota_filter = "AND ts.lec1_quota > 0" if use_quota else ""
+    # H4: exclude teachers at or above weekly session cap (skipped in overflow pass)
+    if ignore_h4_cap:
+        h4_filter = ""
+        h4_params = []
+    else:
+        h4_filter = """
+            AND t.id NOT IN (
+                SELECT teacher1_id FROM schedule
+                WHERE teacher1_id IS NOT NULL
+                GROUP BY teacher1_id
+                HAVING SUM(CASE WHEN time2 IS NOT NULL THEN 2 ELSE 1 END) >= ?
+            )
+        """
+        h4_params = [_TEACHER_WEEKLY_SESSION_CAP]
 
-    # Build unavailability check for each start_time
-    unavail_checks = " OR ".join(
-        ["(tu.day = ? AND tu.start_time = ?)"] * len(start_times)
-    ) if start_times else "0"
-    unavail_params = [v for t in start_times for v in (day, t)]
+    # H8: exclude teachers already at a different centre today
+    h8_filter = ""
+    h8_params = []
+    if current_centre:
+        h8_filter = """
+            AND t.id NOT IN (
+                SELECT s.teacher1_id
+                FROM schedule s
+                JOIN rooms r ON r.code = s.room_code
+                WHERE s.day = ?
+                  AND s.teacher1_id IS NOT NULL
+                  AND r.centre != ?
+            )
+        """
+        h8_params = [day, current_centre]
 
-    # Build double-booking check
-    dbook_checks = " OR ".join(
-        ["(s.day = ? AND (s.time1 LIKE ? OR s.time2 LIKE ?))"] * len(start_times)
-    ) if start_times else "0"
-    dbook_params = [v for t in start_times for v in (day, f"%{t}%", f"%{t}%")]
+    # S1: unavailability filter (skipped when ignore_unavail=True)
+    if ignore_unavail or not start_times:
+        unavail_filter = ""
+        unavail_params = []
+    else:
+        unavail_checks = " OR ".join(
+            ["(tu.day = ? AND tu.start_time = ?)"] * len(start_times))
+        unavail_filter = f"""
+            AND t.id NOT IN (
+                SELECT tu.teacher_id FROM teacher_unavailability tu
+                WHERE {unavail_checks}
+            )
+        """
+        unavail_params = [v for t in start_times for v in (day, t)]
+
+    # Double-booking check (always enforced)
+    if start_times:
+        dbook_checks = " OR ".join(
+            ["(s.day = ? AND (s.time1 LIKE ? OR s.time2 LIKE ?))"] * len(start_times))
+        dbook_filter = f"""
+            AND t.id NOT IN (
+                SELECT s.teacher1_id FROM schedule s
+                WHERE s.teacher1_id IS NOT NULL AND ({dbook_checks})
+            )
+        """
+        dbook_params = [v for t in start_times for v in (day, f"%{t}%", f"%{t}%")]
+    else:
+        dbook_filter = ""
+        dbook_params = []
 
     query = f"""
         SELECT t.id
@@ -612,18 +807,15 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota):
         WHERE ts.subject_code = ?
           {quota_filter}
           AND t.id NOT IN ({placeholders})
-          AND t.id NOT IN (
-              SELECT tu.teacher_id FROM teacher_unavailability tu
-              WHERE {unavail_checks or '0=1'}
-          )
-          AND t.id NOT IN (
-              SELECT s.teacher1_id FROM schedule s
-              WHERE s.teacher1_id IS NOT NULL AND ({dbook_checks or '0=1'})
-          )
+          {h4_filter}
+          {h8_filter}
+          {unavail_filter}
+          {dbook_filter}
         ORDER BY ts.lec1_quota DESC
         LIMIT 1
     """
-    params = [subject_code] + exclude_safe + unavail_params + dbook_params
+    params = ([subject_code] + exclude_safe + h4_params +
+              h8_params + unavail_params + dbook_params)
     row = conn.execute(query, params).fetchone()
     return row[0] if row else None
 
@@ -653,7 +845,8 @@ def collect_results(conn: sqlite3.Connection) -> list:
 
 # ─── Phase 5: Write Excel output ──────────────────────────────────────────────
 
-_TIME_SLOTS = ["0900 - 1100", "1100 - 1300", "1400 - 1600", "1600 - 1800"]
+_TIME_SLOTS = ["0900 - 1100", "1000 - 1200", "1100 - 1300", "1200 - 1400",
+               "1400 - 1600", "1500 - 1700", "1600 - 1800", "1700 - 1900"]
 _DAYS_ORDER  = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 _DAY_ABBR    = {"Monday": "Mon", "Tuesday": "Tue", "Wednesday": "Wed",
                 "Thursday": "Thu", "Friday": "Fri"}
@@ -726,11 +919,12 @@ def write_output(input_path: str, output_path: str, results: list):
 
 # ─── Stats & validation ───────────────────────────────────────────────────────
 
-def collect_stats(conn: sqlite3.Connection, results: list, unassigned: list) -> dict:
-    total  = len(results)
-    lec1   = sum(1 for r in results if r["lec1"])
-    lec2   = sum(1 for r in results if r["lec2"])
-    lec3   = sum(1 for r in results if r["lec3"])
+def collect_stats(conn: sqlite3.Connection, results: list,
+                  unassigned: list, s1_warnings: list = None) -> dict:
+    total   = len(results)
+    lec1    = sum(1 for r in results if r["lec1"])
+    lec2    = sum(1 for r in results if r["lec2"])
+    lec3    = sum(1 for r in results if r["lec3"])
     unavail = conn.execute(
         "SELECT COUNT(*) FROM teacher_unavailability").fetchone()[0]
 
@@ -756,6 +950,7 @@ def collect_stats(conn: sqlite3.Connection, results: list, unassigned: list) -> 
         "scheduled":       lec1,
         "total_classes":   total,
         "unassigned":      unassigned,
+        "warnings":        s1_warnings or [],
         "violations":      [],
         "lec2_coverage":   lec2,
         "lec3_coverage":   lec3,
@@ -825,9 +1020,9 @@ def run_from_bytes(excel_bytes: bytes) -> tuple:
             "Please upload the original Planning for Timetable.xlsx, "
             "not a previous output file.")
 
-    unassigned = assign_teachers(conn)
+    unassigned, s1_warnings = assign_teachers(conn)
     results    = collect_results(conn)
-    stats      = collect_stats(conn, results, unassigned)
+    stats      = collect_stats(conn, results, unassigned, s1_warnings)
     del conn
     gc.collect()
 
@@ -856,9 +1051,9 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
         auto_assign_schedule(conn)
     # else: Class list answer already filled → use existing schedule as-is
 
-    unassigned = assign_teachers(conn)
+    unassigned, s1_warnings = assign_teachers(conn)
     results    = collect_results(conn)
-    stats      = collect_stats(conn, results, unassigned)
+    stats      = collect_stats(conn, results, unassigned, s1_warnings)
     del conn
     gc.collect()
 
@@ -890,7 +1085,7 @@ def main():
     print(f"      {assigned_rooms} class groups assigned rooms")
 
     print("[3/4] Assigning teachers (Lec1 / 2 / 3)...")
-    unassigned = assign_teachers(conn)
+    unassigned, s1_warnings = assign_teachers(conn)
     results    = collect_results(conn)
     lec1_count = sum(1 for r in results if r["lec1"])
     print(f"      {lec1_count}/{len(results)} classes assigned Lec1")
