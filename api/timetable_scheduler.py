@@ -1,8 +1,15 @@
 """
-timetable_scheduler.py  (v4 — full auto-scheduler)
-====================================================
+timetable_scheduler.py  (v6 — v2 meeting constraints)
+======================================================
 v3: Day/Time/Room fixed from Class list answer → assigns Lec1/2/3 only.
 v4: Class list answer empty → auto-assigns Day/Time/Room/Lec1/2/3.
+v6 changes (from scheduling-meeting-v2):
+  H4  → soft cap (warn only, never block)
+  H6  → TKO allows any slot with start ≥ 10:00 (was two fixed windows)
+  H9  → CSW↔SSP and TW→CSW/SSP allowed cross-centre exceptions
+  S1  → teacher can also declare preferred-not centres (new sheet)
+  S2  → tiandi gap check applies to students only (never teachers)
+  CC  → two-phase: Core first, then CC Combine (L1/L2/H5/S4)
 
 Both modes share the same SQLite engine and teacher-assignment logic.
 run_from_bytes()    → v3 (requires pre-filled Class list answer)
@@ -40,7 +47,13 @@ CREATE TABLE class_groups (
 
 CREATE TABLE classes (
     code TEXT PRIMARY KEY, subject_code TEXT, group_code TEXT,
-    student_count INTEGER DEFAULT 0);
+    student_count INTEGER DEFAULT 0,
+    language TEXT DEFAULT NULL,
+    cc_group TEXT DEFAULT NULL);
+
+CREATE TABLE teacher_centre_preference (
+    teacher_id INTEGER, centre TEXT, pref_type TEXT DEFAULT 'avoid',
+    PRIMARY KEY (teacher_id, centre));
 
 CREATE TABLE teachers (
     id INTEGER PRIMARY KEY, name TEXT UNIQUE);
@@ -115,15 +128,26 @@ _TIME_BLOCKS = [
 
 _SINGLE_SLOTS = ["0900 - 1100", "1100 - 1300", "1400 - 1600", "1600 - 1800"]
 
-# H6: TKO air-con cost — only allowed 10:00–14:00 or 15:00–19:00
+# H6: TKO air-con cost — any slot with start ≥ 10:00 is allowed (v6: was two fixed windows)
 _TKO_TIME_BLOCKS = [
-    ("1000 - 1200", "1200 - 1400"),  # morning
-    ("1500 - 1700", "1700 - 1900"),  # afternoon
+    ("1000 - 1200", "1200 - 1400"),  # 10:00–14:00
+    ("1400 - 1600", "1600 - 1800"),  # 14:00–18:00 (added v6)
+    ("1500 - 1700", "1700 - 1900"),  # 15:00–19:00
 ]
-_TKO_SINGLE_SLOTS = ["1000 - 1200", "1200 - 1400", "1500 - 1700", "1700 - 1900"]
+_TKO_SINGLE_SLOTS = [
+    "1000 - 1200", "1100 - 1300", "1200 - 1400",
+    "1400 - 1600", "1500 - 1700", "1600 - 1800", "1700 - 1900",
+]
 
-# H4: teacher weekly session cap (1 session = 1 × 2-hour slot)
+# H4: soft weekly loading cap (warn if exceeded, never block)
 _TEACHER_WEEKLY_SESSION_CAP = 6
+
+# H9: cross-centre pairs that are allowed on the same day (student exceptions v6)
+_H9_ALLOWED_CROSS_CENTRE = {
+    frozenset({"CSW", "SSP"}),  # CSW ↔ SSP bidirectional
+    frozenset({"TW",  "CSW"}),  # TW  ↔ CSW
+    frozenset({"TW",  "SSP"}),  # TW  ↔ SSP
+}
 
 # Centre distance rank from SSP/CSW core (higher = closer)
 # Used for S4 CC Combine tie-breaking and travel risk assessment
@@ -213,8 +237,26 @@ def _load_rooms(conn: sqlite3.Connection, wb):
                      (code_str, centre, int(cap)))
 
 
+def _normalise_language(raw) -> Optional[str]:
+    """Normalise language cell to 'C' (Chinese) or 'E' (English), or None."""
+    if not raw:
+        return None
+    s = str(raw).strip().upper()
+    if s in ("C", "中", "中文", "CHINESE", "广东话", "廣東話", "CANTONESE"):
+        return "C"
+    if s in ("E", "英", "英文", "ENGLISH"):
+        return "E"
+    return None
+
+
 def _load_classes(conn: sqlite3.Connection, wb):
     ws = wb["Class list"]
+    # Detect header to find optional Language and CC Group columns
+    header = [str(c).strip() if c else "" for c in next(ws.iter_rows(min_row=1, max_row=1, values_only=True))]
+    lang_col = next((i for i, h in enumerate(header) if "lang" in h.lower()), None)
+    cc_col   = next((i for i, h in enumerate(header)
+                     if "cc" in h.lower() and "group" in h.lower()), None)
+
     for row in ws.iter_rows(min_row=2, values_only=True):
         code = row[0]
         if not code:
@@ -225,11 +267,13 @@ def _load_classes(conn: sqlite3.Connection, wb):
         centre    = _extract_centre(code_str)
         students  = int(row[7]) if isinstance(row[7], (int, float)) else 0
         is_pc     = 1 if group in ("CS1", "CS2", "CS3") else 0
+        language  = _normalise_language(row[lang_col]) if lang_col is not None and lang_col < len(row) else None
+        cc_group  = str(row[cc_col]).strip() if (cc_col is not None and cc_col < len(row) and row[cc_col]) else None
 
         conn.execute("INSERT OR IGNORE INTO class_groups VALUES (?,?,?)",
                      (group, centre, is_pc))
-        conn.execute("INSERT OR IGNORE INTO classes VALUES (?,?,?,?)",
-                     (code_str, subj_code, group, students))
+        conn.execute("INSERT OR IGNORE INTO classes VALUES (?,?,?,?,?,?)",
+                     (code_str, subj_code, group, students, language, cc_group))
 
 
 def _load_teachers(conn: sqlite3.Connection, wb):
@@ -343,6 +387,33 @@ def _load_existing_schedule(conn: sqlite3.Connection, wb):
     return count
 
 
+def _load_centre_preferences(conn: sqlite3.Connection, wb) -> int:
+    """
+    S1 extension: load teacher centre preferences from optional sheet
+    'Teacher Centre Preference'.  Format: Teacher | Centre | Type (avoid/prefer)
+    Type defaults to 'avoid' if omitted.
+    """
+    if "Teacher Centre Preference" not in wb.sheetnames:
+        return 0
+    ws = wb["Teacher Centre Preference"]
+    count = 0
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or not row[0] or not row[1]:
+            continue
+        name   = str(row[0]).strip()
+        centre = str(row[1]).strip().upper()
+        ptype  = str(row[2]).strip().lower() if len(row) > 2 and row[2] else "avoid"
+        tid_row = conn.execute(
+            "SELECT id FROM teachers WHERE name = ?", (name,)).fetchone()
+        if not tid_row:
+            continue
+        conn.execute(
+            "INSERT OR IGNORE INTO teacher_centre_preference VALUES (?,?,?)",
+            (tid_row[0], centre, ptype))
+        count += 1
+    return count
+
+
 def build_db(wb) -> sqlite3.Connection:
     """
     Build an in-memory SQLite database from an openpyxl workbook.
@@ -354,6 +425,7 @@ def build_db(wb) -> sqlite3.Connection:
     _load_classes(conn, wb)
     _load_teachers(conn, wb)
     n_unavail  = _load_availability(conn, wb)
+    _load_centre_preferences(conn, wb)
     n_schedule = _load_existing_schedule(conn, wb)
     conn.commit()
     return conn, n_schedule, n_unavail
@@ -489,8 +561,9 @@ def _build_teacher_capacity(conn: sqlite3.Connection) -> dict:
 
 def _has_tiandi_violation(group_slots: list, new_slot: str) -> bool:
     """
-    S2: Returns True if adding new_slot creates a gap >2 hrs within the same
-    half-day (AM or PM). Lunch break (13:00-14:00) is not counted.
+    S2 (students only): Returns True if adding new_slot creates a gap >2 hrs
+    within the same half-day (AM or PM). Lunch break is not counted.
+    This function is only called for student class-group slots, never for teachers.
     """
     new_half  = _SLOT_HALF_DAY.get(new_slot)
     new_start = _SLOT_START_HOUR.get(new_slot)
@@ -506,23 +579,30 @@ def _has_tiandi_violation(group_slots: list, new_slot: str) -> bool:
     return False
 
 
-def auto_assign_schedule(conn: sqlite3.Connection) -> int:
+def auto_assign_schedule(conn: sqlite3.Connection,
+                          cc_only: bool = False) -> int:
     """
-    v4: auto-assign Day/Time/Room for every class.
+    v4/v6: auto-assign Day/Time/Room for every class.
 
     Constraints enforced:
-    - H6: TKO uses 10:00-14:00 / 15:00-19:00 time slots only
+    - H6: TKO allows any slot with start ≥ 10:00
     - H9: A class group cannot appear at two different centres on the same day
-    - S2: No gap >2 hrs within same AM or PM half-day (no dead sessions)
+          (exception: CSW↔SSP and TW→CSW/SSP allowed per _H9_ALLOWED_CROSS_CENTRE)
+    - S2: No gap >2 hrs within same AM or PM half-day — students only
     - S3: Day rotation so same-subject classes spread across Mon-Fri
+
+    cc_only=True  → only process classes that have a cc_group set (Phase B)
+    cc_only=False → only process classes with cc_group IS NULL (Phase A, default)
     """
     from collections import defaultdict
 
-    classes = conn.execute("""
+    cc_filter = "IS NOT NULL" if cc_only else "IS NULL"
+    classes = conn.execute(f"""
         SELECT c.code, c.group_code, c.student_count, c.subject_code,
                sub.loading_hrs
         FROM classes c
         JOIN subjects sub ON sub.code = c.subject_code
+        WHERE c.cc_group {cc_filter}
         ORDER BY c.student_count DESC, c.code ASC
     """).fetchall()
 
@@ -561,9 +641,11 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
 
         for day in day_order:
             # H9: skip day if group is already at a different centre
+            # Exception: allowed cross-centre pairs (CSW↔SSP, TW→CSW/SSP)
             committed = group_day_centre.get((group, day))
             if committed and room_centre and committed != room_centre:
-                continue
+                if frozenset({committed, room_centre}) not in _H9_ALLOWED_CROSS_CENTRE:
+                    continue
 
             existing_slots = group_day_slots[(group, day)]
 
@@ -623,6 +705,164 @@ def auto_assign_schedule(conn: sqlite3.Connection) -> int:
     return count
 
 
+# ─── Phase 2c: CC Combine scheduling (L1 / L2 / H5 / S4) ────────────────────
+
+def _select_cc_centre(conn: sqlite3.Connection, class_codes: list) -> list:
+    """
+    S4: Return centres ordered by descending student count across the CC group.
+    Tie-break: prefer centres closer to SSP/CSW (higher _CENTRE_RANK).
+    """
+    centre_students: dict = {}
+    for code in class_codes:
+        row = conn.execute("""
+            SELECT cg.centre, c.student_count
+            FROM classes c
+            JOIN class_groups cg ON cg.code = c.group_code
+            WHERE c.code = ?
+        """, (code,)).fetchone()
+        if row:
+            c, s = row[0], row[1] or 0
+            centre_students[c] = centre_students.get(c, 0) + s
+    return sorted(centre_students.keys(),
+                  key=lambda c: (-centre_students[c], -_CENTRE_RANK.get(c, 0)))
+
+
+def _find_cc_day(conn: sqlite3.Connection, class_codes: list,
+                 centre: str) -> Optional[str]:
+    """
+    L1: Find a day where NONE of the CC group's students already have a Core
+    class at a different centre.  Returns the first valid day or None.
+    """
+    for day in _DAY_PRIORITY:
+        conflict = False
+        for code in class_codes:
+            group = _extract_group(code)
+            # Check if this group has any scheduled class at a *different* centre
+            # on this day (Core classes are already scheduled at Phase A)
+            row = conn.execute("""
+                SELECT r.centre FROM schedule s
+                JOIN rooms r ON r.code = s.room_code
+                WHERE s.group_code = ? AND s.day = ?
+                  AND r.centre != ?
+                LIMIT 1
+            """, (group, day, centre)).fetchone()
+            if row:
+                conflict = True
+                break
+        if not conflict:
+            return day
+    return None
+
+
+def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
+    """
+    Phase B: schedule CC Combine classes (those with cc_group set).
+
+    For each CC group:
+      H5: validate all classes share the same subject_code and language.
+      S4: pick centre with most students (tie-break by _CENTRE_RANK).
+      L1: find a day where no student has a Core class at another centre.
+      L2: if L1 fails, try next-best centre.
+      → ERROR if all centres fail.
+
+    CC classes do NOT need to follow H3 (campus restriction).
+    Returns (assigned_count, error_groups).
+    """
+    groups = conn.execute("""
+        SELECT cc_group, subject_code, language,
+               GROUP_CONCAT(code) AS codes
+        FROM classes
+        WHERE cc_group IS NOT NULL
+        GROUP BY cc_group, subject_code, language
+    """).fetchall()
+
+    assigned = 0
+    errors   = []
+
+    for grp in groups:
+        cc_group   = grp["cc_group"]
+        subj       = grp["subject_code"]
+        lang       = grp["language"]
+        codes      = grp["codes"].split(",")
+
+        # H5: all codes must share same subject (already guaranteed by GROUP BY)
+        # but log if language is mixed
+        lang_check = conn.execute("""
+            SELECT DISTINCT language FROM classes WHERE cc_group = ?
+        """, (cc_group,)).fetchall()
+        if len(lang_check) > 1:
+            errors.append(f"{cc_group}: mixed languages — H5 violated, skipped")
+            continue
+
+        # S4 / L1 / L2: try each centre in preference order
+        centre_order = _select_cc_centre(conn, codes)
+        scheduled    = False
+
+        for centre in centre_order:
+            day = _find_cc_day(conn, codes, centre)
+            if not day:
+                continue
+
+            # Find a suitable room at this centre
+            total_students = sum(
+                (conn.execute("SELECT student_count FROM classes WHERE code=?",
+                              (c,)).fetchone() or [0])[0]
+                for c in codes
+            )
+            room = conn.execute("""
+                SELECT code FROM rooms
+                WHERE centre = ? AND capacity >= ?
+                ORDER BY capacity ASC LIMIT 1
+            """, (centre, total_students)).fetchone()
+            if not room:
+                continue
+
+            room_code = room[0]
+            loading   = conn.execute(
+                "SELECT loading_hrs FROM subjects WHERE code=?",
+                (subj,)).fetchone()
+            loading_hrs = (loading[0] if loading else 4) or 4
+            need_two    = loading_hrs >= 4
+            time_blocks = _TKO_TIME_BLOCKS if centre == "TKO" else _TIME_BLOCKS
+            single_slots = _TKO_SINGLE_SLOTS if centre == "TKO" else _SINGLE_SLOTS
+
+            # Find a free slot on that day
+            slot1 = slot2 = None
+            if need_two:
+                for s1, s2 in time_blocks:
+                    if (_room_free(conn, room_code, day, s1) and
+                            _room_free(conn, room_code, day, s2)):
+                        slot1, slot2 = s1, s2
+                        break
+            else:
+                for s in single_slots:
+                    if _room_free(conn, room_code, day, s):
+                        slot1 = s
+                        break
+
+            if not slot1:
+                continue
+
+            # Write one schedule row per CC class code
+            for code in codes:
+                group = _extract_group(code)
+                conn.execute("""
+                    INSERT OR REPLACE INTO schedule
+                        (class_code, group_code, day, time1, time2, room_code)
+                    VALUES (?,?,?,?,?,?)
+                """, (code, group, day, slot1, slot2, room_code))
+                assigned += 1
+
+            scheduled = True
+            break
+
+        if not scheduled:
+            errors.append(f"{cc_group}: no valid day/centre found (L2 exhausted) — ERROR")
+
+    conn.commit()
+    return assigned, errors
+
+
 # ─── Phase 3: Assign teachers ─────────────────────────────────────────────────
 
 def assign_teachers(conn: sqlite3.Connection):
@@ -668,27 +908,35 @@ def assign_teachers(conn: sqlite3.Connection):
 
         warn_reason = None
 
-        # Pass 1: fully strict
+        # Pass 1: fully strict (quota + avail + H4 cap + H8 + centre pref)
         lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
                              use_quota=True, current_centre=current_centre)
         # Pass 2: relax subject quota
         if not lec1:
             lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
                                  use_quota=False, current_centre=current_centre)
-        # Pass 3: relax H4 weekly cap (overflow warning)
+        # Pass 3: ignore centre preference (S1b soft warning)
         if not lec1:
             lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
                                  use_quota=False, current_centre=current_centre,
-                                 ignore_h4_cap=True)
+                                 ignore_centre_pref=True)
             if lec1:
-                warn_reason = "H4: teacher assigned beyond 6-session weekly cap"
-        # Pass 4: ignore unavailability (S1 forced)
+                warn_reason = "S1b: teacher assigned to non-preferred centre"
+        # Pass 4: relax H4 soft cap (overflow warning)
         if not lec1:
             lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
                                  use_quota=False, current_centre=current_centre,
-                                 ignore_h4_cap=True, ignore_unavail=True)
+                                 ignore_h4_cap=True, ignore_centre_pref=True)
             if lec1:
-                warn_reason = "S1: teacher assigned to unavailable slot (cap also exceeded)"
+                warn_reason = "H4 (soft): teacher exceeds preferred weekly loading of 6 sessions"
+        # Pass 5: ignore unavailability (S1 forced, last resort)
+        if not lec1:
+            lec1 = _find_teacher(conn, subj, day, starts, exclude=[],
+                                 use_quota=False, current_centre=current_centre,
+                                 ignore_h4_cap=True, ignore_centre_pref=True,
+                                 ignore_unavail=True)
+            if lec1:
+                warn_reason = "S1: teacher assigned to unavailable slot (loading also exceeded)"
 
         if not lec1:
             unassigned.append(code)
@@ -723,15 +971,17 @@ def assign_teachers(conn: sqlite3.Connection):
 
 
 def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
-                  current_centre=None, ignore_unavail=False, ignore_h4_cap=False):
+                  current_centre=None, ignore_unavail=False, ignore_h4_cap=False,
+                  ignore_centre_pref=False):
     """
     Find the best available teacher for a subject at given day/start_times.
 
     Parameters:
-      use_quota:      only consider teachers with lec1_quota > 0 (H7)
-      current_centre: exclude teachers already at a different centre today (H8)
-      ignore_unavail: skip unavailability filter (S1 forced fallback)
-      ignore_h4_cap:  skip weekly session cap filter (H4 overflow fallback)
+      use_quota:           only consider teachers with lec1_quota > 0 (H7)
+      current_centre:      exclude teachers already at a different centre today (H8)
+      ignore_unavail:      skip unavailability filter (S1 forced fallback)
+      ignore_h4_cap:       skip weekly session cap filter (H4 soft cap fallback)
+      ignore_centre_pref:  skip centre preference filter (S1b fallback)
 
     Returns (teacher_id | None).
     """
@@ -770,6 +1020,19 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
             )
         """
         h8_params = [day, current_centre]
+
+    # S1b: centre preference filter (skipped when ignore_centre_pref=True)
+    if ignore_centre_pref or not current_centre:
+        cpref_filter = ""
+        cpref_params = []
+    else:
+        cpref_filter = """
+            AND t.id NOT IN (
+                SELECT teacher_id FROM teacher_centre_preference
+                WHERE centre = ? AND pref_type = 'avoid'
+            )
+        """
+        cpref_params = [current_centre]
 
     # S1: unavailability filter (skipped when ignore_unavail=True)
     if ignore_unavail or not start_times:
@@ -810,13 +1073,14 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
           AND t.id NOT IN ({placeholders})
           {h4_filter}
           {h8_filter}
+          {cpref_filter}
           {unavail_filter}
           {dbook_filter}
         ORDER BY ts.lec1_quota DESC
         LIMIT 1
     """
     params = ([subject_code] + exclude_safe + h4_params +
-              h8_params + unavail_params + dbook_params)
+              h8_params + cpref_params + unavail_params + dbook_params)
     row = conn.execute(query, params).fetchone()
     return row[0] if row else None
 
@@ -1049,12 +1313,21 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     gc.collect()
 
     if n_sched == 0:
-        auto_assign_schedule(conn)
+        # Phase A: schedule Core classes (no cc_group)
+        auto_assign_schedule(conn, cc_only=False)
+        # Phase B: schedule CC Combine classes (cc_group set)
+        cc_assigned, cc_errors = cc_assign_schedule(conn)
+    else:
+        cc_errors = []
     # else: Class list answer already filled → use existing schedule as-is
 
     unassigned, s1_warnings = assign_teachers(conn)
     results    = collect_results(conn)
     stats      = collect_stats(conn, results, unassigned, s1_warnings)
+    if cc_errors:
+        stats.setdefault("warnings", [])
+        for e in cc_errors:
+            stats["warnings"].append({"class": e, "teacher": "", "day": "", "reason": "CC Combine ERROR"})
     del conn
     gc.collect()
 

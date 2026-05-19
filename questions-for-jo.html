@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>問 Jo 的問題清單 — 排班 Constraints</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", sans-serif;
+    background: #fff; color: #1e293b; font-size: 13.5px; line-height: 1.65;
+  }
+  @media print {
+    body { font-size: 11.5px; }
+    .no-print { display: none; }
+    .page { padding: 20px 28px 40px; }
+    .section { break-inside: avoid; }
+  }
+
+  .page { max-width: 820px; margin: 0 auto; padding: 40px 36px 60px; }
+
+  /* Header */
+  .header { border-bottom: 3px solid #1e40af; padding-bottom: 16px; margin-bottom: 28px; }
+  .header h1 { font-size: 1.35rem; font-weight: 800; color: #0f172a; }
+  .header .sub { font-size: .82rem; color: #64748b; margin-top: 6px; }
+  .header .meta { display: flex; gap: 28px; margin-top: 10px; font-size: .8rem; color: #64748b; }
+  .header .meta span::before { content: "▸ "; color: #1e40af; }
+
+  /* Print button */
+  .print-btn {
+    display: block; margin: 0 auto 28px; padding: 9px 28px;
+    background: #1e40af; color: #fff; border: none; border-radius: 6px;
+    font-size: .88rem; font-weight: 600; cursor: pointer;
+  }
+  .print-btn:hover { background: #1d4ed8; }
+
+  /* Context box */
+  .context-box {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 14px 18px; margin-bottom: 28px; font-size: .82rem; color: #475569;
+  }
+  .context-box strong { color: #0f172a; }
+
+  /* Section */
+  .section { margin-bottom: 24px; }
+  .section-header {
+    display: flex; align-items: center; gap: 10px;
+    background: #f1f5f9; padding: 8px 14px; border-radius: 6px; margin-bottom: 0;
+  }
+  .section-header h2 { font-size: .88rem; font-weight: 800; color: #0f172a; }
+
+  .badge {
+    padding: 2px 10px; border-radius: 20px;
+    font-size: .68rem; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+  }
+  .badge-hard  { background: #fee2e2; color: #dc2626; }
+  .badge-soft  { background: #fef3c7; color: #b45309; }
+  .badge-logic { background: #dbeafe; color: #1e40af; }
+  .badge-other { background: #f3e8ff; color: #7c3aed; }
+
+  /* Question table */
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th {
+    background: #f8fafc; color: #475569; padding: 7px 12px; text-align: left;
+    font-size: .73rem; font-weight: 700; border-bottom: 1.5px solid #e2e8f0;
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+
+  .col-no  { width: 38px; color: #94a3b8; font-weight: 700; font-size: .8rem; text-align: center; }
+  .col-ref { width: 60px; }
+  .col-q   { width: auto; font-weight: 500; color: #0f172a; }
+  .col-ans { width: 200px; }
+
+  .ref-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: .7rem; font-weight: 700; white-space: nowrap;
+  }
+  .ref-hard  { background: #fee2e2; color: #dc2626; }
+  .ref-soft  { background: #fef3c7; color: #b45309; }
+  .ref-logic { background: #dbeafe; color: #1e40af; }
+  .ref-other { background: #f3e8ff; color: #7c3aed; }
+
+  .ans-box {
+    border: 1px dashed #cbd5e1; border-radius: 5px;
+    padding: 6px 10px; min-height: 44px;
+    font-size: .78rem; color: #94a3b8;
+  }
+
+  .context-note {
+    font-size: .77rem; color: #64748b; margin-top: 3px; font-weight: 400;
+  }
+
+  hr { border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }
+
+  /* Summary bar */
+  .summary-bar {
+    display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap;
+  }
+  .sum-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 20px; padding: 5px 14px; font-size: .78rem;
+  }
+  .sum-num { font-weight: 800; font-size: 1rem; }
+  .sum-num.hard  { color: #dc2626; }
+  .sum-num.soft  { color: #d97706; }
+  .sum-num.logic { color: #1e40af; }
+  .sum-num.other { color: #7c3aed; }
+
+  /* Sign-off */
+  .signoff {
+    margin-top: 36px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
+    font-size: .82rem;
+  }
+  .signoff-item .label { color: #64748b; margin-bottom: 4px; }
+  .signoff-item .line {
+    border-bottom: 1px solid #cbd5e1; padding-bottom: 30px; margin-bottom: 4px;
+  }
+  .signoff-item .hint { font-size: .72rem; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <button class="print-btn no-print" onclick="window.print()">列印 / 另存 PDF</button>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>問 Jo 的問題清單 — 排班 Constraints</h1>
+    <div class="sub">根據 scheduling-meeting-v2 整理；所有待確認 / 有變化的規則</div>
+    <div class="meta">
+      <span>日期：___________</span>
+      <span>出席：___________</span>
+      <span>紀錄：___________</span>
+    </div>
+  </div>
+
+  <!-- Context -->
+  <div class="context-box">
+    以下問題來自 v2 會議記錄中 <strong>狀態未定（待確認）、規則有新變化、或邏輯細節不清</strong> 的條目。
+    請逐條確認 Jo 的答案並填入「Jo 的答案」欄，方便之後更新系統邏輯。
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-bar">
+    <div class="sum-chip"><span class="sum-num hard">7</span><span>Hard Constraints</span></div>
+    <div class="sum-chip"><span class="sum-num soft">6</span><span>Soft Constraints</span></div>
+    <div class="sum-chip"><span class="sum-num logic">2</span><span>CC Combine 邏輯</span></div>
+    <div class="sum-chip"><span class="sum-num other">3</span><span>老師分配</span></div>
+    <div class="sum-chip" style="font-weight:700">共 18 條問題</div>
+  </div>
+
+
+  <!-- ── HARD CONSTRAINTS ── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="badge badge-hard">HARD</span>
+      <h2>Hard Constraints</h2>
+    </div>
+    <table>
+      <tr>
+        <th class="col-no">#</th>
+        <th class="col-ref">規則</th>
+        <th class="col-q">問題</th>
+        <th class="col-ans">Jo 的答案</th>
+      </tr>
+      <tr>
+        <td class="col-no">1</td>
+        <td><span class="ref-tag ref-hard">H2</span></td>
+        <td>
+          CC 合班時，兩班可以來自不同 Center 嗎？課室算哪個 Center 的？
+          <div class="context-note">v2 備注：Combine course logic exception (can be different centre)</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">2</td>
+        <td><span class="ref-tag ref-hard">H3</span></td>
+        <td>
+          TS（天水圍）學生的 Core 科可以排到哪個 Center？有什麼具體條件？
+          <div class="context-note">v2 備注：Except TS. Special conditions need to be clarified</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">3</td>
+        <td><span class="ref-tag ref-hard">H3</span></td>
+        <td>
+          TS 例外規則這個學期已適用，還是 next year 才改？
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">4</td>
+        <td><span class="ref-tag ref-hard">H4</span></td>
+        <td>
+          H4 要從 Hard 改成 Soft constraint 嗎？如果是，警告閾值是多少班？
+          <div class="context-note">v2 備注：Change to soft, no need to be 6</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">5</td>
+        <td><span class="ref-tag ref-hard">H4</span></td>
+        <td>
+          4 小時的班算 1 loading 還是 2 loading？
+          <div class="context-note">v2 定義改為：1 loading = 1 班（唯論 2hr 定 4hr）</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">6</td>
+        <td><span class="ref-tag ref-hard">H6</span></td>
+        <td>
+          TKO 新規則是「開始時間 ≥ 10:00 即可」，還是仍分兩窗口（10–14 / 15–19）？
+          <div class="context-note">v2 備注：All class started after 10:00 can be allowed</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">7</td>
+        <td><span class="ref-tag ref-hard">H6</span></td>
+        <td>
+          跨越 14:00–15:00 空段的課（例如 13:00–17:00）在 TKO 算合法嗎？
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">8</td>
+        <td><span class="ref-tag ref-hard">H8</span></td>
+        <td>
+          老師同天兩個 Center — H8 還是 Hard，還是降為 Soft？
+          <div class="context-note">v2 狀態從「確認」改為「待確認」；備注：Can allow: Need travel time, Geo distance</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">9</td>
+        <td><span class="ref-tag ref-hard">H8</span></td>
+        <td>
+          如果 H8 有例外，哪些 Center pair 算地理上可接受？需要多少 travel time buffer？
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">10</td>
+        <td><span class="ref-tag ref-hard">H9</span></td>
+        <td>
+          CSW ↔ SSP 是雙向都允許，還是只允許單方向？
+          <div class="context-note">v2 備注：Only except: CSW to SSP case / TW to CSW / SSP</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">11</td>
+        <td><span class="ref-tag ref-hard">H9</span></td>
+        <td>
+          TW → CSW 和 TW → SSP 都允許嗎？反方向（CSW → TW）呢？
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+    </table>
+  </div>
+
+  <hr>
+
+  <!-- ── SOFT CONSTRAINTS ── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="badge badge-soft">SOFT</span>
+      <h2>Soft Constraints</h2>
+    </div>
+    <table>
+      <tr>
+        <th class="col-no">#</th>
+        <th class="col-ref">規則</th>
+        <th class="col-q">問題</th>
+        <th class="col-ans">Jo 的答案</th>
+      </tr>
+      <tr>
+        <td class="col-no">12</td>
+        <td><span class="ref-tag ref-soft">S1</span></td>
+        <td>
+          老師除了申報不可用時段，也可以申報「不喜歡的 Center」嗎？算 Soft 還是 Hard？
+          <div class="context-note">v2 備注：Add not prefer centre</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">13</td>
+        <td><span class="ref-tag ref-soft">S1</span></td>
+        <td>
+          老師如何輸入不可用時間和 Center preference？Excel 填表？系統介面選擇？
+          <div class="context-note">v2 Open Issue #1：老師不可用時間的輸入格式待定</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">14</td>
+        <td><span class="ref-tag ref-soft">S2</span></td>
+        <td>
+          確認：天地堂規則只檢查學生，老師完全不警告？
+          <div class="context-note">v2 備注：Only student.</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">15</td>
+        <td><span class="ref-tag ref-soft">S3</span></td>
+        <td>
+          什麼是 cadet class？哪些科目代號屬於？固定 Wed / Fri 是「只能排」還是「不能排」這兩天？
+          <div class="context-note">v2 備注：Wed, Fri (cadet class, fix location)</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">16</td>
+        <td><span class="ref-tag ref-soft">S3</span></td>
+        <td>
+          Cadet class 影響到已排好的班，是需要人手調整還是系統重排？
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">17</td>
+        <td><span class="ref-tag ref-soft">S4</span></td>
+        <td>
+          Jo 的 grouping logic 是什麼？例如 DAE106_TS1 + DAE106_TS2 合一組、TM3 獨立——理解正確嗎？完整 list 什麼時候可以提供？
+          <div class="context-note">v2 備注：Jo's grouping logic — DAE106_TS1 &amp; TS2 / TM3 — Need to be listed</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+    </table>
+  </div>
+
+  <hr>
+
+  <!-- ── CC COMBINE ── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="badge badge-logic">LOGIC</span>
+      <h2>CC Combine 邏輯</h2>
+    </div>
+    <table>
+      <tr>
+        <th class="col-no">#</th>
+        <th class="col-ref">規則</th>
+        <th class="col-q">問題</th>
+        <th class="col-ans">Jo 的答案</th>
+      </tr>
+      <tr>
+        <td class="col-no">18</td>
+        <td><span class="ref-tag ref-logic">L1</span></td>
+        <td>
+          CC 課確認不需遵守 H3（不限 enrolled campus）？但仍需符合 H9 嗎？兩個規則如何並行？
+          <div class="context-note">v2 備注：CC no need to follow H3 rule.</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+    </table>
+  </div>
+
+  <hr>
+
+  <!-- ── TEACHER ASSIGNMENT ── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="badge badge-other">其他</span>
+      <h2>老師分配（Next Week 跟進）</h2>
+    </div>
+    <table>
+      <tr>
+        <th class="col-no">#</th>
+        <th class="col-ref">分類</th>
+        <th class="col-q">問題</th>
+        <th class="col-ans">Jo 的答案</th>
+      </tr>
+      <tr>
+        <td class="col-no">19</td>
+        <td><span class="ref-tag ref-other">分配</span></td>
+        <td>
+          English teacher、Local teacher、Net teacher 在排班邏輯上有什麼差異？系統需要區分嗎？
+          <div class="context-note">v2 備注：Need to be assigned by Jo</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">20</td>
+        <td><span class="ref-tag ref-other">成本</span></td>
+        <td>
+          「price」需要納入排班考慮嗎（即成本優化）？還是只由 Jo 人手決定？
+          <div class="context-note">v2 備注：Need to consider the price, and time available</div>
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">21</td>
+        <td><span class="ref-tag ref-other">時間表</span></td>
+        <td>
+          老師分配名單什麼時候可以提供？
+        </td>
+        <td><div class="ans-box"></div></td>
+      </tr>
+    </table>
+  </div>
+
+
+  <!-- Sign-off -->
+  <div class="signoff">
+    <div class="signoff-item">
+      <div class="label">問題由誰確認</div>
+      <div class="line"></div>
+      <div class="hint">姓名 / 日期</div>
+    </div>
+    <div class="signoff-item">
+      <div class="label">Jo 確認簽署</div>
+      <div class="line"></div>
+      <div class="hint">簽名 / 日期</div>
+    </div>
+    <div class="signoff-item">
+      <div class="label">下次更新系統日期</div>
+      <div class="line"></div>
+      <div class="hint">_____ 年 _____ 月 _____ 日</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
