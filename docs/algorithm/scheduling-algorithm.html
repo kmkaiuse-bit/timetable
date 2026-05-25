@@ -200,6 +200,20 @@
   .legend-item { display: flex; align-items: center; gap: 6px; font-size: .82rem; }
   .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
 
+  /* ── Travel matrix ── */
+  .matrix-wrap { overflow-x: auto; margin: 18px 0; }
+  .matrix-tbl { border-collapse: collapse; font-size: .78rem; white-space: nowrap; background: #fff;
+    border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+  .matrix-tbl th { background: #1e40af; color: #fff; padding: 7px 10px; text-align: center; font-size: .75rem; }
+  .matrix-tbl th.row-label { background: #1e3a8a; text-align: left; padding: 7px 12px; }
+  .matrix-tbl td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #f1f5f9; font-weight: 700; }
+  .matrix-tbl tr:last-child td { border-bottom: none; }
+  .m-self { background: #f1f5f9; color: #94a3b8; }
+  .m-near { background: #dcfce7; color: #15803d; }
+  .m-mid  { background: #fef9c3; color: #92400e; }
+  .m-far  { background: #fee2e2; color: #dc2626; }
+  .m-xfar { background: #fce7f3; color: #9d174d; }
+
   /* ── Two col ── */
   .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
   @media(max-width:580px){ .cols2 { grid-template-columns: 1fr; } }
@@ -252,7 +266,7 @@
 <body>
 
 <div class="hero">
-  <div class="version">V4 ALGORITHM SPEC · 2026</div>
+  <div class="version">V6 ALGORITHM SPEC · 2026</div>
   <h1>HKIT 排班算法完整規則說明</h1>
   <p>Constraints · Logic · Warnings · 處理優先次序</p>
 </div>
@@ -292,19 +306,20 @@
           <li>同一老師不能同時教兩班</li>
           <li>同一課室不能同時用兩班</li>
           <li>學生上課地點必須符合報名</li>
-          <li>老師每週最多 6 節</li>
           <li>CC combine：同科目 + 同語言</li>
           <li>課室座位不能超出上限</li>
-          <li>時間段規則（TKO 特別時段）</li>
+          <li>TKO 時段：開始時間 ≥ 10:00（V6 放寬）</li>
           <li>老師同一天不能去兩個 center</li>
-          <li>學生同一天不能去兩個 center</li>
+          <li>學生同一天不能去兩個 center<br><small style="color:#94a3b8">（例外：CSW↔SSP、TW↔CSW/SSP 允許同天）</small></li>
         </ul>
       </div>
       <div class="mini-card">
         <h4>🟡 Soft Constraints（盡量符合）</h4>
         <ul>
-          <li>老師不可用時間偏好</li>
-          <li>不要天地堂（同半天 &gt;2hr 空）</li>
+          <li>老師不可用時間偏好（S1a）</li>
+          <li>老師中意/不中意 Center 偏好（S1b，新增）</li>
+          <li>不要天地堂（同半天 &gt;2hr 空）—— <strong>學生適用</strong></li>
+          <li>老師每週 Loading ≤ 6 班（Soft cap，V6 降級）</li>
           <li>CC combine 地點在最多學生 center</li>
           <li>班別平均分佈至每天</li>
         </ul>
@@ -351,6 +366,11 @@
         <td>✅ 必填</td>
         <td>10 個 Center 代號及地區，用作 CC combine 地點選擇及走 center 評估</td>
       </tr>
+      <tr>
+        <td><strong>老師 Center 偏好</strong></td>
+        <td>⚪ 可選</td>
+        <td>Sheet「Teacher Centre Preference」：老師 | Center 代號 | 類型（avoid / prefer）。留空則視為無偏好。（V6 新增，S1b）</td>
+      </tr>
     </table>
   </div>
 
@@ -391,17 +411,6 @@
     </div>
 
     <div class="constraint hard">
-      <div class="c-icon">📊</div>
-      <div class="c-body">
-        <h3>H4 · 老師每週 Loading 上限 6 班 <span class="tag tag-hard">HARD</span></h3>
-        <p>
-          每位老師每週最多分配 <strong>6 班</strong>（以「班」計算，即 1 個 class assignment = 1 loading，不論該班係 2小時還是 4小時）。<br>
-          個別老師如有特別安排可個別設定。
-        </p>
-      </div>
-    </div>
-
-    <div class="constraint hard">
       <div class="c-icon">🔗</div>
       <div class="c-body">
         <h3>H5 · CC Combine 條件：同科目 + 同語言 <span class="tag tag-hard">HARD</span></h3>
@@ -414,8 +423,10 @@
       <div class="c-body">
         <h3>H6 · TKO Center 特別時段 <span class="tag tag-hard">HARD</span></h3>
         <p>
-          TKO Center 冷氣費用問題，上課時段必須為 <strong>10:00–14:00</strong> 或 <strong>15:00–19:00</strong>。<br>
-          不得排 09:00 開始的班（老師及學生均適用）。
+          TKO Center 冷氣費用問題，上課時段開始時間必須 <strong>≥ 10:00</strong>（老師及學生均適用）。<br>
+          即有效起始時間：10:00、11:00、12:00、14:00、15:00、16:00、17:00。<br>
+          <strong>不得排 09:00 開始的班。</strong><br>
+          <em>V6 放寬：原為兩個固定視窗（10–14、15–19），現改為任何 ≥ 10:00 起始均可。</em>
         </p>
       </div>
     </div>
@@ -434,7 +445,7 @@
         <h3>H8 · 老師同一天不能去兩個 Center <span class="tag tag-hard">HARD</span></h3>
         <p>
           分配老師時，必須檢查：該老師當天是否已在另一個 Center 有課？<br>
-          如有，直接排除——不論兩個 Center 距離遠近，一律不允許。<br>
+          如有，直接排除——不論兩個 Center 距離遠近，一律不允許。此規則在所有 5 個分配輪次中<strong>不可放寬</strong>。<br>
           <strong>與舊 S3 的分別：</strong>由「盡量避免 + Warning」升級為「絕對不允許」。
         </p>
       </div>
@@ -446,7 +457,15 @@
         <h3>H9 · 學生同一天不能去兩個 Center <span class="tag tag-hard">HARD</span></h3>
         <p>
           排某班在 Center A、Day X 時，必須確保：該班所有學生當天沒有在另一個 Center B 的課。<br>
-          <strong>對 CC Combine 的影響：</strong>CC combine 班必須排在「所有相關學生當天沒有 Core 科在其他 Center」的日子。
+          <strong>V6 例外（允許同天跨 Center 的組合）：</strong>
+        </p>
+        <ul style="margin:6px 0 6px 20px;font-size:.87rem;color:#475569">
+          <li>CSW ↔ SSP（雙向）</li>
+          <li>TW ↔ CSW</li>
+          <li>TW ↔ SSP</li>
+        </ul>
+        <p>
+          <strong>對 CC Combine 的影響：</strong>CC combine 班（Phase B）必須排在「所有相關學生當天沒有 Core 科在其他非例外 Center」的日子。
           如找不到符合條件的日子，才考慮調整 combine 地點（見 CC Combine 邏輯）。
         </p>
       </div>
@@ -465,10 +484,33 @@
     <div class="constraint soft">
       <div class="c-icon">📅</div>
       <div class="c-body">
-        <h3>S1 · 老師不可用時間偏好 <span class="tag tag-soft">SOFT</span></h3>
+        <h3>S1a · 老師不可用時間偏好 <span class="tag tag-soft">SOFT</span></h3>
         <p>
           老師申報的不可用時段（例如：「星期一全天不許可」），系統排班時優先跳過。<br>
-          如所有其他時段均無法排班，系統需標記衝突並提示人手確認。
+          排班第 5 輪才強制使用該時段（最後手段），並標記警告「S1: teacher assigned to unavailable slot」。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint soft">
+      <div class="c-icon">🏢</div>
+      <div class="c-body">
+        <h3>S1b · 老師 Center 偏好（V6 新增）<span class="tag tag-soft">SOFT</span></h3>
+        <p>
+          老師可在「Teacher Centre Preference」表申報不想去的 Center（pref_type = avoid）。<br>
+          系統排班第 2 輪會跳過該 Center。第 3 輪起才忽略此偏好，並標記警告「S1b: teacher assigned to non-preferred centre」。
+        </p>
+      </div>
+    </div>
+
+    <div class="constraint soft">
+      <div class="c-icon">📊</div>
+      <div class="c-body">
+        <h3>S(H4) · 老師每週 Loading 上限 6 班（V6 降級為 Soft）<span class="tag tag-soft">SOFT</span></h3>
+        <p>
+          每位老師每週建議最多 <strong>6 班</strong>（以「班」計算，即 1 class assignment = 1 loading，不論 2 小時或 4 小時）。<br>
+          V6 改為 <strong>Soft cap</strong>：若超出，系統繼續排班並標記警告「H4 (soft): teacher exceeds preferred weekly loading」。<br>
+          <em>V4 曾為 Hard Constraint，V6 降級以避免無法分配老師的情況。</em>
         </p>
       </div>
     </div>
@@ -478,10 +520,10 @@
       <div class="c-body">
         <h3>S2 · 不要天地堂（同半天內空堂 &gt;2 小時）<span class="tag tag-soft">SOFT</span></h3>
         <p>
-          <strong>適用對象：</strong>老師及學生均適用。<br>
+          <strong>適用對象：學生（V6 修改）</strong>——老師天地堂不再由系統檢查。<br>
           <strong>定義：</strong>在同一半天（AM 或 PM block）內，兩節課之間的空堂超過 2 小時，即算天地堂。<br>
           <strong>午飯時間不計：</strong>AM block 最後一節與 PM block 第一節之間的午飯時間不算天地堂。<br>
-          <strong>例外：</strong>如老師/學生只上半天，不需考慮天地堂。
+          <strong>例外：</strong>如學生只上半天，不需考慮天地堂。
         </p>
       </div>
     </div>
@@ -526,8 +568,8 @@
       </div>
       <div class="time-block tko">
         <div class="t-label">TKO 將軍澳（冷氣費用問題）</div>
-        <div class="t-slots">10:00 – 14:00 &nbsp;/&nbsp; 15:00 – 19:00</div>
-        <div class="t-note">⚠ 不可排 09:00 開始的班（老師+學生均適用）</div>
+        <div class="t-slots">任何開始時間 ≥ 10:00 的時段</div>
+        <div class="t-note">⚠ 不可排 09:00 開始的班（老師+學生均適用）<br>有效起始：10、11、12、14、15、16、17 時（V6 放寬）</div>
       </div>
     </div>
 
@@ -565,110 +607,124 @@
   ══════════════════════════════════════════ -->
   <div class="section" id="centers">
     <div class="sec-label logic">Center 距離分析</div>
-    <h2>10 個 Center 距離排名（以 SSP/CSW 為核心）</h2>
+    <h2>10 個 Center 兩兩交通時間（分鐘）</h2>
 
-    <p>用於評估老師走 center 的風險，以及 CC combine 地點的「附近」判斷。</p>
+    <p>
+      由於每位老師的起點不同（有老師住將軍澳，有老師住荃灣），單一以 SSP/CSW 為原點的排名未能反映實際交通負擔。<br>
+      V6 改用<strong>兩兩對照表</strong>，顯示各 Center 之間估算的港鐵直達時間（分鐘，含換乘等候，誤差 ±5 分鐘）。<br>
+      老師可透過 <strong>S1b（Teacher Centre Preference）</strong> 申報不想前往的 Center，由系統自動迴避。
+    </p>
 
-    <table>
-      <tr>
-        <th>排名</th>
-        <th>代號</th>
-        <th>地區</th>
-        <th>區域描述</th>
-        <th>估算 Travel Time</th>
-        <th>走 Center 風險</th>
-      </tr>
-      <tr>
-        <td><span class="rank-badge near">9</span></td>
-        <td><strong>SSP / CSW</strong></td>
-        <td>深水埗 / 長沙灣</td>
-        <td>核心區域，教室最密集</td>
-        <td><span class="travel-chip t-near">核心</span></td>
-        <td>—</td>
-      </tr>
-      <tr>
-        <td><span class="rank-badge near" style="background:#22c55e">8</span></td>
-        <td><strong>WT</strong></td>
-        <td>黃大仙</td>
-        <td>九龍中部偏東，最近鄰</td>
-        <td><span class="travel-chip t-near">~20 min</span></td>
-        <td>✅ 低風險</td>
-      </tr>
-      <tr>
-        <td><span class="rank-badge" style="background:#84cc16;color:#fff">7</span></td>
-        <td><strong>TS / TW</strong></td>
-        <td>青衣 / 荃灣</td>
-        <td>新界西入口，車程直接</td>
-        <td><span class="travel-chip t-near">~25 min</span></td>
-        <td>✅ 低風險</td>
-      </tr>
-      <tr>
-        <td><span class="rank-badge" style="background:#eab308;color:#fff">6</span></td>
-        <td><strong>ST</strong></td>
-        <td>沙田</td>
-        <td>經隧道後首站，中程</td>
-        <td><span class="travel-chip t-mid">~30 min</span></td>
-        <td>⚠ 中等風險</td>
-      </tr>
-      <tr>
-        <td><span class="rank-badge" style="background:#f97316;color:#fff">5</span></td>
-        <td><strong>SW</strong></td>
-        <td>上環</td>
-        <td>港島區，需過海</td>
-        <td><span class="travel-chip t-mid">~30 min</span></td>
-        <td>⚠ 中等風險</td>
-      </tr>
-      <tr>
-        <td><span class="rank-badge" style="background:#ef4444">4</span></td>
-        <td><strong>KT</strong></td>
-        <td>觀塘</td>
-        <td>九龍東端，需橫跨九龍</td>
-        <td><span class="travel-chip t-far">~35 min</span></td>
-        <td>🔴 高風險</td>
-      </tr>
-      <tr>
-        <td><span class="rank-badge far">3</span></td>
-        <td><strong>TKO</strong></td>
-        <td>將軍澳</td>
-        <td>九龍東延伸，偏遠</td>
-        <td><span class="travel-chip t-far">~45 min</span></td>
-        <td>🔴 高風險</td>
-      </tr>
-      <tr>
-        <td><span class="rank-badge far">2</span></td>
-        <td><strong>TM</strong></td>
-        <td>屯門</td>
-        <td>新界西偏遠</td>
-        <td><span class="travel-chip t-far">~60 min</span></td>
-        <td>🔴 極高風險</td>
-      </tr>
-      <tr>
-        <td><span class="rank-badge far">1</span></td>
-        <td><strong>FL</strong></td>
-        <td>粉嶺</td>
-        <td>新界北，最遠</td>
-        <td><span class="travel-chip t-far">~60 min</span></td>
-        <td>🔴 極高風險</td>
-      </tr>
-    </table>
+    <div class="legend" style="margin-bottom:12px">
+      <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div>≤ 20 分鐘（鄰近）</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fde68a"></div>21–40 分鐘（中程）</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div>41–60 分鐘（遠程）</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f9a8d4"></div>&gt; 60 分鐘（極遠）</div>
+    </div>
+
+    <div class="matrix-wrap">
+      <table class="matrix-tbl">
+        <tr>
+          <th class="row-label">出發 ↓ / 目的 →</th>
+          <th>SSP/CSW</th><th>WT</th><th>KT</th><th>TKO</th>
+          <th>ST</th><th>FL</th><th>SW</th><th>TW</th><th>TS</th><th>TM</th>
+        </tr>
+        <tr>
+          <th class="row-label">SSP / CSW（深水埗/長沙灣）</th>
+          <td class="m-self">—</td>
+          <td class="m-near">12</td><td class="m-mid">22</td><td class="m-mid">35</td>
+          <td class="m-mid">25</td><td class="m-far">55</td><td class="m-mid">22</td>
+          <td class="m-near">15</td><td class="m-mid">22</td><td class="m-far">42</td>
+        </tr>
+        <tr>
+          <th class="row-label">WT（黃大仙）</th>
+          <td class="m-near">12</td><td class="m-self">—</td>
+          <td class="m-near">12</td><td class="m-mid">22</td><td class="m-mid">22</td>
+          <td class="m-mid">38</td><td class="m-mid">32</td><td class="m-mid">30</td>
+          <td class="m-mid">35</td><td class="m-far">55</td>
+        </tr>
+        <tr>
+          <th class="row-label">KT（觀塘）</th>
+          <td class="m-mid">22</td><td class="m-near">12</td><td class="m-self">—</td>
+          <td class="m-near">12</td><td class="m-mid">22</td><td class="m-far">42</td>
+          <td class="m-far">40</td><td class="m-far">45</td><td class="m-far">45</td><td class="m-xfar">65</td>
+        </tr>
+        <tr>
+          <th class="row-label">TKO（將軍澳）</th>
+          <td class="m-mid">35</td><td class="m-mid">22</td><td class="m-near">12</td>
+          <td class="m-self">—</td>
+          <td class="m-mid">30</td><td class="m-far">50</td><td class="m-far">50</td>
+          <td class="m-far">55</td><td class="m-far">55</td><td class="m-xfar">75</td>
+        </tr>
+        <tr>
+          <th class="row-label">ST（沙田）</th>
+          <td class="m-mid">25</td><td class="m-mid">22</td><td class="m-mid">22</td>
+          <td class="m-mid">30</td><td class="m-self">—</td><td class="m-mid">25</td>
+          <td class="m-mid">38</td><td class="m-mid">38</td><td class="m-far">40</td><td class="m-xfar">60</td>
+        </tr>
+        <tr>
+          <th class="row-label">FL（粉嶺）</th>
+          <td class="m-far">55</td><td class="m-mid">38</td><td class="m-far">42</td>
+          <td class="m-far">50</td><td class="m-mid">25</td><td class="m-self">—</td>
+          <td class="m-xfar">60</td><td class="m-xfar">65</td><td class="m-xfar">65</td><td class="m-xfar">80</td>
+        </tr>
+        <tr>
+          <th class="row-label">SW（上環）</th>
+          <td class="m-mid">22</td><td class="m-mid">32</td><td class="m-far">40</td>
+          <td class="m-far">50</td><td class="m-mid">38</td><td class="m-xfar">60</td>
+          <td class="m-self">—</td><td class="m-mid">30</td><td class="m-mid">35</td><td class="m-far">55</td>
+        </tr>
+        <tr>
+          <th class="row-label">TW（荃灣）</th>
+          <td class="m-near">15</td><td class="m-mid">30</td><td class="m-far">45</td>
+          <td class="m-far">55</td><td class="m-mid">38</td><td class="m-xfar">65</td>
+          <td class="m-mid">30</td><td class="m-self">—</td><td class="m-near">10</td><td class="m-mid">35</td>
+        </tr>
+        <tr>
+          <th class="row-label">TS（青衣）</th>
+          <td class="m-mid">22</td><td class="m-mid">35</td><td class="m-far">45</td>
+          <td class="m-far">55</td><td class="m-far">40</td><td class="m-xfar">65</td>
+          <td class="m-mid">35</td><td class="m-near">10</td><td class="m-self">—</td><td class="m-mid">30</td>
+        </tr>
+        <tr>
+          <th class="row-label">TM（屯門）</th>
+          <td class="m-far">42</td><td class="m-far">55</td><td class="m-xfar">65</td>
+          <td class="m-xfar">75</td><td class="m-xfar">60</td><td class="m-xfar">80</td>
+          <td class="m-far">55</td><td class="m-mid">35</td><td class="m-mid">30</td><td class="m-self">—</td>
+        </tr>
+      </table>
+    </div>
 
     <div class="cols2" style="margin-top:18px">
       <div class="mini-card">
-        <h4>走 Center 判斷邏輯</h4>
+        <h4>H8：老師跨 Center 規則（Hard）</h4>
         <ul>
-          <li>排名差距 ≤2：低風險，≥2hr buffer 足夠</li>
-          <li>排名差距 3–4：中等風險，發 Warning</li>
-          <li>排名差距 ≥5：極高風險，強 Warning，建議人手審查</li>
+          <li>同一天同一老師只能在一個 Center 授課</li>
+          <li>完全禁止——無論距離遠近</li>
+          <li>此規則在所有 5 個分配輪次中不可放寬</li>
+          <li>老師 Center 偏好請用 S1b 申報</li>
         </ul>
       </div>
       <div class="mini-card">
-        <h4>CC Combine「附近」定義</h4>
+        <h4>S4：CC Combine 地點「附近」判斷</h4>
         <ul>
-          <li>同一地區（排名差距 ≤1）：首選</li>
-          <li>排名差距 2–3：可接受</li>
-          <li>排名差距 ≥4：盡量避免，發 Warning</li>
+          <li>首選：學生人數最多的 Center</li>
+          <li>平局時選 _CENTRE_RANK 較高（距 SSP/CSW 較近）的 Center</li>
+          <li>學生單程 ≤ 20 min：首選</li>
+          <li>學生單程 21–40 min：可接受</li>
+          <li>學生單程 > 40 min：發 Warning（建議確認）</li>
         </ul>
       </div>
+    </div>
+
+    <div class="warn-box" style="margin-top:4px">
+      <h3>老師 Center 距離與 S1b 使用建議</h3>
+      <ul>
+        <li>住在 TKO 的老師若要去 TM，單程 75 分鐘——建議在 Teacher Centre Preference 填寫 avoid TM</li>
+        <li>住在 TW/TS 的老師，KT/TKO 均需 45–55 分鐘——可酌情申報 avoid</li>
+        <li>住在 FL 的老師，TM 需 80 分鐘（全網最遠）——強烈建議申報 avoid TM</li>
+        <li>S1b 由系統在排班輪次 1–2 迴避；輪次 3 起放寬（標記警告）</li>
+      </ul>
     </div>
   </div>
 
@@ -680,11 +736,12 @@
     <div class="sec-label logic">Loading 計算</div>
     <h2>老師 Loading 規則</h2>
 
-    <div class="constraint hard">
+    <div class="constraint soft">
       <div class="c-icon">📊</div>
       <div class="c-body">
-        <h3>每位老師每週最多 6 班（Hard）</h3>
-        <p>以「班」計算（1 class assignment = 1 loading），不論每班係 2小時還是 4小時。個別老師可設定不同上限。</p>
+        <h3>每位老師每週建議 ≤ 6 班（V6：Soft Cap）</h3>
+        <p>以「班」計算（1 class assignment = 1 loading），不論每班係 2小時還是 4小時。<br>
+        V6 將此規則降級為 Soft：超出時系統繼續排班並標記警告，不會因此阻塞排班。</p>
       </div>
     </div>
 
@@ -705,12 +762,12 @@
       <tr>
         <td>正常</td>
         <td>1 – 5 班</td>
-        <td>正常分配</td>
+        <td>正常分配（輪次 1–2）</td>
       </tr>
       <tr>
-        <td>已達上限</td>
+        <td>達建議上限</td>
         <td>6 班</td>
-        <td>不再分配新班，除非人手 override</td>
+        <td>輪次 1–3 不再分配；輪次 4 起放寬（Soft cap，標記警告）</td>
       </tr>
       <tr>
         <td>空置</td>
@@ -718,9 +775,9 @@
         <td>系統優先分配（避免老師長期閒置）</td>
       </tr>
       <tr>
-        <td>超出上限</td>
+        <td>超出建議上限</td>
         <td>&gt;6 班</td>
-        <td>只在找不到其他老師時才放寬（系統標記警告）</td>
+        <td>第 4 輪分配時放寬，標記「H4 (soft)」警告</td>
       </tr>
     </table>
   </div>
@@ -744,37 +801,38 @@
       </div>
     </div>
 
-    <h3 style="margin-top:20px;margin-bottom:12px">Combine 地點 + 日子選擇流程（受 H9 約束）</h3>
+    <h3 style="margin-top:20px;margin-bottom:12px">兩階段排班（V6 兩相排班）</h3>
 
     <div style="background:#eff6ff;border-left:4px solid #1e40af;padding:14px 18px;border-radius:0 10px 10px 0;margin-bottom:18px;font-size:.88rem;color:#1e3a8a;">
-      <strong>核心原則：</strong>先排 Core 科，再為 CC combine 班選日子。<br>
-      CC combine 班只能排在「所有相關學生當天不需去另一個 Center」的日子。
+      <strong>Phase A：</strong>先排所有 Core 科目（cc_group 為空的班）。<br>
+      <strong>Phase B：</strong>Core 排完後，再為各 CC Combine 組選日子與地點。<br>
+      核心原則：CC combine 班只能排在「所有相關學生當天不需去另一個非例外 Center」的日子。
     </div>
 
     <div class="flow">
       <div class="flow-step">
         <div class="f-num">1</div>
         <div class="f-body">
-          <h4>統計各 Campus 學生人數，確定首選 Combine 地點</h4>
-          <p>人數最多的 Center 為首選。平局時選距 SSP/CSW 較近者。</p>
+          <h4>統計各 Campus 學生人數，確定首選 Combine 地點（S4）</h4>
+          <p>人數最多的 Center 為首選。平局時選距 SSP/CSW 較近者（_CENTRE_RANK 排名）。</p>
         </div>
       </div>
       <div class="flow-step">
         <div class="f-num">2</div>
         <div class="f-body">
-          <h4>【方法 A】搜尋符合 H9 的日子</h4>
+          <h4>【L1】搜尋符合 H9 的日子</h4>
           <p>
-            在首選 Combine Center，找一個日子，使得所有 combine 學生當天的 Core 科也在同一 Center（或當天無 Core 科）。<br>
-            <strong>如找到 → 排定，完成。</strong>
+            在首選 Combine Center，按 Mon→Tue→Thu→Wed→Fri 順序，找一個日子，使得所有 combine 組的學生當天的 Core 科不在另一個 Center（H9 例外組合除外）。<br>
+            <strong>如找到 → 確認課室容量後排定，完成。</strong>
           </p>
         </div>
       </div>
       <div class="flow-step">
         <div class="f-num">3</div>
         <div class="f-body">
-          <h4>【方法 B】調整 Combine 地點再搜尋</h4>
+          <h4>【L2】調整 Combine 地點再搜尋</h4>
           <p>
-            如方法 A 找不到合適日子，改以「次多學生」的 Center 作為 combine 地點，重複步驟 2。<br>
+            如 L1 找不到合適日子，改以「次多學生」的 Center 作為 combine 地點，重複 L1 步驟。<br>
             依此類推，逐個 Center 嘗試，直至找到可行方案。
           </p>
         </div>
@@ -783,14 +841,14 @@
         <div class="f-num">4</div>
         <div class="f-body">
           <h4>確認課室容量</h4>
-          <p>確認目標 Center 在選定日子有足夠座位的課室可用（合計所有 combine 學生人數）。</p>
+          <p>確認目標 Center 在選定日子有容量 ≥ 合計學生人數的空置課室可用。</p>
         </div>
       </div>
       <div class="flow-step">
         <div class="f-num" style="background:#dc2626">!</div>
         <div class="f-body">
-          <h4>所有方法均失敗 → 標記 ERROR，等候人手決定</h4>
-          <p>所有 Center 及所有日子均無法在不違反 H9 的情況下安排，系統發出 ERROR 並提示管理員人手處理。</p>
+          <h4>所有 Center + 所有日子均失敗 → ERROR，等候人手決定</h4>
+          <p>所有 Center 及所有日子均無法在不違反 H9 的情況下安排，系統發出 ERROR（「no valid day/centre found, L2 exhausted」）並提示管理員人手處理。</p>
         </div>
       </div>
     </div>
@@ -842,39 +900,35 @@
       <li>
         <div class="step-num">2</div>
         <div>
-          <h3>預處理：CC Combine 分組</h3>
+          <h3>預處理：CC Combine 分組（H5）</h3>
           <p>
-            將所有 CC 科目，按「科目代號 + 語言」分組。<br>
-            每組計算各 Campus 人數，決定 combine 地點及合計人數，形成「combine 班別清單」。
+            將所有 CC 科目，按「科目代號 + 語言」分組（cc_group 欄位）。<br>
+            每組統計各 Campus 人數，決定 combine 地點優先次序，形成「combine 班別清單」（Phase B 執行）。
           </p>
         </div>
       </li>
       <li>
         <div class="step-num teal">3</div>
         <div>
-          <h3>排班優先次序</h3>
-          <p>按以下次序排班（先難後易）：</p>
+          <h3>Phase A：排 Core 科目（cc_group 為空的班）</h3>
+          <p>按以下次序排班（先難後易），僅處理 Core 班：</p>
           <div class="priority-row">
             <div class="prio prio-1">① 人數最多班別</div>
             <span class="prio-arrow">→</span>
-            <div class="prio prio-2">② Core 科目</div>
+            <div class="prio prio-2">② 較難分配班</div>
             <span class="prio-arrow">→</span>
-            <div class="prio prio-3">③ CC Combine 班</div>
-            <span class="prio-arrow">→</span>
-            <div class="prio prio-4">④ 一般班別</div>
-            <span class="prio-arrow">→</span>
-            <div class="prio prio-5">⑤ 剩餘班別</div>
+            <div class="prio prio-5">③ 其餘班別</div>
           </div>
         </div>
       </li>
       <li>
         <div class="step-num">4</div>
         <div>
-          <h3>為每班選擇時間段（輪流發牌）</h3>
+          <h3>為每班選擇時間段（輪流發牌 S3）</h3>
           <p>
-            按班別序號輪流從不同日子優先嘗試（Mon → Tue → Thu → Wed → Fri → 再從 Mon 開始）。<br>
+            按科目輪流從不同日子優先嘗試（Mon → Tue → Thu → Wed → Fri → 再從 Mon 開始）。<br>
             確認該時段於指定 Center 有空置且合適的課室。<br>
-            檢查：是否違反 H6（TKO 時段）、是否會製造天地堂（S2）。
+            檢查：是否違反 H6（TKO 開始時間 ≥ 10:00）、是否會製造學生天地堂（S2）、是否學生當天已在另一 Center（H9）。
           </p>
         </div>
       </li>
@@ -883,41 +937,57 @@
         <div>
           <h3>選擇課室</h3>
           <p>
-            <strong>首選：</strong>班別代號對應的課室（例如 DAE101_TW2 → TW-TW2）。<br>
+            <strong>首選：</strong>班別代號對應的課室（例如 DAE101_TW2 → TW - TW2）。<br>
             <strong>次選：</strong>同 Center 內最大的空置課室（座位足夠）。<br>
-            <strong>最後：</strong>全 Center 範圍搜尋（跨 Center 課室，少見）。
+            <strong>最後：</strong>任何座位足夠的課室（少見）。
           </p>
         </div>
       </li>
       <li>
-        <div class="step-num">6</div>
+        <div class="step-num teal">6</div>
         <div>
-          <h3>分配老師（Lec1）</h3>
+          <h3>Phase B：排 CC Combine 班</h3>
           <p>
-            條件（必須全部符合）：<br>
-            ① 教得該科 &nbsp;② 當天/時段可用（不可用時間偏好）&nbsp;③ 未超出 Loading 上限<br>
-            ④ <strong>該天未在另一個 Center 授課（H8）</strong><br><br>
-            找不到時：放寬 Loading 上限再搜尋 → 仍找不到：標記「未能分配老師」。<br>
-            注意：H8（不能走 center）不可放寬，此條為 Hard Constraint。
+            Core 排班完成後，執行 CC Combine 排班（見 CC Combine 邏輯）。<br>
+            依 S4 → L1 → L2 → ERROR 順序處理每個 CC 組。<br>
+            CC 班排好後，進行老師分配（步驟 7–8）。
           </p>
         </div>
       </li>
       <li>
         <div class="step-num">7</div>
         <div>
-          <h3>分配後備老師（Lec2、Lec3）</h3>
-          <p>條件：教得該科 + 該時段無衝突（不需檢查 Loading 及 Center 限制）。</p>
+          <h3>分配老師 Lec1（5 輪搜尋）</h3>
+          <p>
+            <strong>H8 在所有輪次中不可放寬（不能走 center）。</strong><br>
+            輪次順序：
+          </p>
+          <ol style="margin:6px 0 0 20px;font-size:.85rem;color:#475569">
+            <li>Pass 1：教得該科 + 有 quota + 可用時段 + H4 cap + H8 centre + S1b centre pref</li>
+            <li>Pass 2：放寬 quota，其餘不變</li>
+            <li>Pass 3：放寬 quota + 忽略 S1b centre pref（標記 S1b 警告）</li>
+            <li>Pass 4：放寬 quota + 忽略 S1b + 忽略 H4 cap（標記 H4 soft 警告）</li>
+            <li>Pass 5：Pass 4 + 忽略不可用時段（標記 S1 警告，最後手段）</li>
+          </ol>
+          <p style="margin-top:6px">全部 5 輪均找不到 → 標記「未能分配老師」。</p>
         </div>
       </li>
       <li>
-        <div class="step-num teal">8</div>
+        <div class="step-num">8</div>
+        <div>
+          <h3>分配後備老師（Lec2、Lec3）</h3>
+          <p>條件：教得該科 + 該時段無衝突（不需檢查 Loading、H4 及 Center 限制）。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num teal">9</div>
         <div>
           <h3>執行所有 Warning 檢查</h3>
           <p>完成排班後，逐一檢查 Soft Constraints，生成 Warning 清單（見下節）。</p>
         </div>
       </li>
       <li>
-        <div class="step-num">9</div>
+        <div class="step-num">10</div>
         <div>
           <h3>輸出結果</h3>
           <p>
@@ -942,20 +1012,20 @@
       <h3>🔴 錯誤（排班失敗，需人手介入）</h3>
       <ul>
         <li>找不到合適課室（座位不足或 Center 全滿）</li>
-        <li>找不到任何合資格老師（Lec1 無法分配）</li>
-        <li>CC Combine：所有 Center 及所有日子均違反 H9（學生當天要去兩個 Center）</li>
+        <li>找不到任何合資格老師（Lec1 5 輪均失敗，H8 阻擋）</li>
+        <li>CC Combine：所有 Center 及所有日子 L2 窮盡後仍違反 H9</li>
         <li>CC Combine 地點確定後課室仍不足</li>
-        <li>老師在所有可用時段均已被 H8 阻擋（當天已在其他 Center 授課）</li>
       </ul>
     </div>
 
     <div class="warn-box">
       <h3>🟡 警告（排班完成，但需人手確認）</h3>
       <ul>
-        <li>老師被分配到申報不可用的時段（S1 偏好被迫違反）</li>
-        <li>老師或學生出現天地堂（同半天空堂 &gt;2hr）</li>
-        <li>老師 Loading 超出 6 節（放寬後才分配到老師）</li>
-        <li>CC Combine 地點非首選（方法 B 介入，調整了 combine 地點）</li>
+        <li><strong>S1：</strong>老師被迫分配到申報不可用的時段（Pass 5 強制分配，loading 亦超出）</li>
+        <li><strong>S1b：</strong>老師被分配到不想去的 Center（Pass 3 忽略 centre pref）</li>
+        <li><strong>H4 (soft)：</strong>老師 Loading 超出 6 班建議上限（Pass 4 放寬）</li>
+        <li><strong>S2：</strong>學生出現天地堂（同半天空堂 &gt;2hr）</li>
+        <li>CC Combine 地點非首選（L2 介入，調整了 combine 地點）</li>
         <li>CC Combine 地點距部分學生 Campus 較遠（排名差距 ≥4）</li>
       </ul>
     </div>
@@ -987,13 +1057,13 @@
       <tr>
         <td>🟠 STRONG WARNING</td>
         <td>橙色</td>
-        <td>老師走遠 Center / Loading 超出</td>
+        <td>老師走遠 Center / H4 soft Loading 超出</td>
         <td>建議調整，需確認</td>
       </tr>
       <tr>
         <td>🟡 WARNING</td>
         <td>黃色</td>
-        <td>天地堂 / 老師偏好衝突</td>
+        <td>學生天地堂 / S1 強制不可用時段 / S1b Centre 偏好衝突</td>
         <td>審閱後可接受</td>
       </tr>
       <tr>
@@ -1009,7 +1079,7 @@
   <hr class="divider">
 
   <footer>
-    HKIT 排班算法規則說明 &nbsp;·&nbsp; V4 &nbsp;·&nbsp; 2026年5月
+    HKIT 排班算法規則說明 &nbsp;·&nbsp; V6 &nbsp;·&nbsp; 2026年5月
     &nbsp;·&nbsp; 如有問題請聯絡系統管理員
   </footer>
 

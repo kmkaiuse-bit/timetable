@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>時間表系統 — 原理說明</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", sans-serif;
+    background: #f8fafc; color: #1e293b; line-height: 1.7; font-size: 16px;
+  }
+
+  .hero {
+    background: #1e40af; color: #fff;
+    padding: 52px 32px 44px; text-align: center;
+  }
+  .hero h1 { font-size: 2rem; font-weight: 800; }
+  .hero p  { font-size: 1.05rem; opacity: .7; margin-top: 6px; }
+
+  .page { max-width: 820px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  /* Section */
+  .section { margin-bottom: 60px; }
+  .sec-label {
+    display: inline-block;
+    background: #1e40af; color: #fff;
+    border-radius: 4px; padding: 2px 10px;
+    font-size: .72rem; font-weight: 700;
+    letter-spacing: .06em; margin-bottom: 8px;
+  }
+  h2 { font-size: 1.45rem; font-weight: 800; color: #0f172a; margin-bottom: 16px; }
+  p  { color: #334155; margin-bottom: 14px; }
+
+  /* Big quote / key message */
+  .key-msg {
+    background: #eff6ff; border-left: 5px solid #1e40af;
+    padding: 18px 24px; border-radius: 0 12px 12px 0;
+    font-size: 1.05rem; color: #1e3a8a; font-weight: 600;
+    margin: 20px 0;
+  }
+
+  /* Step */
+  .step-list { list-style: none; padding: 0; }
+  .step-list li {
+    display: flex; gap: 20px; padding: 20px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .step-list li:last-child { border-bottom: none; }
+  .step-num {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #1e40af; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 1.1rem; flex-shrink: 0; margin-top: 2px;
+  }
+  .step-body h3 { font-size: 1rem; font-weight: 700; margin-bottom: 5px; }
+  .step-body p  { font-size: .92rem; margin-bottom: 0; }
+
+  /* Big analogy */
+  .analogy {
+    background: #fff; border: 1px solid #e2e8f0;
+    border-radius: 16px; padding: 28px 28px;
+    margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,.05);
+  }
+  .analogy .emoji { font-size: 2.5rem; margin-bottom: 10px; }
+  .analogy h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+  .analogy p  { font-size: .92rem; color: #475569; margin-bottom: 0; }
+
+  /* Two columns */
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  @media(max-width:580px){ .cols2 { grid-template-columns: 1fr; } }
+
+  /* Card */
+  .card {
+    background: #fff; border-radius: 14px;
+    border: 1px solid #e2e8f0; padding: 22px 22px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+  .card .card-icon { font-size: 2rem; margin-bottom: 8px; }
+  .card h3 { font-size: .95rem; font-weight: 700; margin-bottom: 6px; }
+  .card p  { font-size: .87rem; color: #64748b; margin-bottom: 0; }
+
+  /* Visual example — schedule */
+  .sched-eg {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    overflow: hidden; margin: 20px 0; font-size: .85rem;
+  }
+  .sched-hdr {
+    background: #1e40af; color: #fff; padding: 10px 16px;
+    font-weight: 700; display: grid;
+    grid-template-columns: 80px repeat(4, 1fr); gap: 1px;
+  }
+  .sched-hdr span { text-align: center; }
+  .sched-hdr span:first-child { text-align: left; }
+  .sched-row {
+    display: grid; grid-template-columns: 80px repeat(4, 1fr);
+    gap: 1px; border-bottom: 1px solid #f1f5f9;
+  }
+  .sched-row:last-child { border-bottom: none; }
+  .sched-cell {
+    padding: 10px 10px; text-align: center;
+    font-size: .8rem; min-height: 46px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sched-cell.room { font-weight: 700; background: #f8fafc; justify-content: flex-start; font-size: .78rem; color: #475569; }
+  .sched-cell.blue   { background: #eff6ff; border-left: 4px solid #3b82f6; }
+  .sched-cell.green  { background: #f0fdf4; border-left: 4px solid #10b981; }
+  .sched-cell.amber  { background: #fffbeb; border-left: 4px solid #f59e0b; }
+  .sched-cell.purple { background: #f5f3ff; border-left: 4px solid #8b5cf6; }
+  .sched-cell.empty  { background: #fafafa; }
+  .cell-code { font-weight: 700; display: block; }
+  .cell-teacher { color: #64748b; font-size: .72rem; }
+
+  /* Rule */
+  .rule {
+    display: flex; gap: 16px; align-items: flex-start;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 12px;
+  }
+  .rule-icon { font-size: 1.8rem; flex-shrink: 0; line-height: 1; }
+  .rule h3 { font-size: .92rem; font-weight: 700; margin-bottom: 4px; }
+  .rule p  { font-size: .87rem; color: #475569; margin-bottom: 0; }
+
+  /* Deal cards diagram */
+  .deal-wrap { margin: 20px 0; }
+  .deal-row  {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid #f1f5f9;
+    font-size: .88rem;
+  }
+  .deal-row:last-child { border-bottom: none; }
+  .deal-class { width: 130px; font-weight: 600; flex-shrink: 0; color: #334155; }
+  .deal-card {
+    padding: 5px 12px; border-radius: 20px; font-size: .78rem; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .dc-mon  { background: #1e40af; color: #fff; }
+  .dc-tue  { background: #2563eb; color: #fff; }
+  .dc-thu  { background: #3b82f6; color: #fff; }
+  .dc-wed  { background: #93c5fd; color: #1e3a8a; }
+  .dc-fri  { background: #dbeafe; color: #1e3a8a; }
+  .dc-mon2 { background: #e0e7ff; color: #3730a3; }
+  .deal-label { color: #94a3b8; font-size: .78rem; }
+
+  /* Input list */
+  .input-list { list-style: none; padding: 0; margin: 16px 0; }
+  .input-list li {
+    display: flex; gap: 14px; padding: 14px 0;
+    border-bottom: 1px solid #f1f5f9; align-items: flex-start;
+  }
+  .input-list li:last-child { border-bottom: none; }
+  .input-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+  .input-body strong { display: block; font-size: .92rem; margin-bottom: 2px; }
+  .input-body span   { font-size: .84rem; color: #64748b; }
+  .tag {
+    display: inline-block; padding: 1px 8px; border-radius: 4px;
+    font-size: .72rem; font-weight: 700; margin-left: 6px;
+    background: #dcfce7; color: #15803d;
+  }
+  .tag.req { background: #fef9c3; color: #854d0e; }
+
+  /* What the output looks like */
+  .output-box {
+    background: #f0fdf4; border: 1.5px solid #86efac;
+    border-radius: 12px; padding: 20px 24px; margin: 20px 0;
+  }
+  .output-box h3 { font-size: .95rem; font-weight: 700; color: #15803d; margin-bottom: 10px; }
+  .output-box ul { list-style: none; padding: 0; }
+  .output-box li { font-size: .88rem; padding: 4px 0; color: #166534; }
+  .output-box li::before { content: "✓ "; font-weight: 700; }
+
+  /* Divider */
+  .divider { border: none; border-top: 2px solid #e2e8f0; margin: 48px 0; }
+
+  /* Highlight */
+  mark { background: #fef9c3; padding: 1px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>時間表排班系統</h1>
+  <p>「你只需告訴系統，哪位老師哪天唔得閒——其餘交給系統。」</p>
+</div>
+
+<div class="page">
+
+
+  <!-- WHAT IS IT -->
+  <div class="section">
+    <div class="sec-label">系統是什麼</div>
+    <h2>一句話解釋</h2>
+
+    <div class="key-msg">
+      你提供班別名單、老師資料、課室名單，<br>
+      系統自動幫你填好整份時間表——哪天、幾點、哪個課室、哪位老師。
+    </div>
+
+    <p>以前要人手把 100+ 班填入時間表，既費時又容易出錯（例如同一位老師被排了兩個同時進行的班）。這個系統把這件事自動化。</p>
+  </div>
+
+
+  <!-- WHAT DO YOU GIVE IT -->
+  <div class="section">
+    <div class="sec-label">你要提供什麼</div>
+    <h2>只需填一份 Excel</h2>
+
+    <p>整份 Excel 有幾個分頁，每個分頁填一類資料：</p>
+
+    <ul class="input-list">
+      <li>
+        <div class="input-icon">📋</div>
+        <div class="input-body">
+          <strong>班別名單 <span class="tag req">必填</span></strong>
+          <span>所有班別的代號（例如 DAE101_TW2）、科目、每週課時、學生人數</span>
+        </div>
+      </li>
+      <li>
+        <div class="input-icon">👩‍🏫</div>
+        <div class="input-body">
+          <strong>老師名單 <span class="tag req">必填</span></strong>
+          <span>每位老師可教哪些科目，以及最多可以教幾班（Quota）</span>
+        </div>
+      </li>
+      <li>
+        <div class="input-icon">🏫</div>
+        <div class="input-body">
+          <strong>課室名單 <span class="tag req">必填</span></strong>
+          <span>每個課室的代號及座位數，系統用來配對合適大小的課室</span>
+        </div>
+      </li>
+      <li>
+        <div class="input-icon">🗓️</div>
+        <div class="input-body">
+          <strong>老師不可用時間 <span class="tag">可選</span></strong>
+          <span>哪位老師哪天哪個時段唔得閒，填 <strong>N</strong>，空白即任何時間均可</span>
+        </div>
+      </li>
+    </ul>
+
+    <div class="output-box">
+      <h3>系統輸出給你：</h3>
+      <ul>
+        <li>每個班別排在哪天、幾點、哪個課室</li>
+        <li>每個班別的主教老師（Lec1）及後備老師（Lec2、Lec3）</li>
+        <li>完整的每日時間表（Mon 至 Fri）</li>
+        <li>可直接下載的 Excel 檔</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- HOW DOES IT WORK — SIMPLE -->
+  <div class="section">
+    <div class="sec-label">排班過程</div>
+    <h2>系統怎樣排？用 4 個步驟</h2>
+
+    <ul class="step-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>讀取所有資料</h3>
+          <p>系統把 Excel 裡的班別、老師、課室全部讀進記憶體，準備開始計算。</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>為每個班別找一個「時間 + 課室」</h3>
+          <p>
+            系統逐個班別（由人數多到少）嘗試找一個合適的時間和課室安排。
+            找到了就記下來，找不到就留待人手補排。
+          </p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>為每個班別找一位老師</h3>
+          <p>
+            時間和課室確定後，系統再找一位合適的主教老師，然後再找兩位後備。
+            規則很簡單：教得、唔衝突、唔超出本身可教的班數上限。
+          </p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>輸出 Excel 供下載</h3>
+          <p>把所有排班結果整理成 Excel，顯示在網頁時間表上，可以直接下載。</p>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+
+  <hr class="divider">
+
+
+  <!-- STEP 2 — ROOM LOGIC -->
+  <div class="section">
+    <div class="sec-label">課室怎麼選</div>
+    <h2>課室跟班別代號掛勾</h2>
+
+    <div class="analogy">
+      <div class="emoji">🏫</div>
+      <h3>原則：同一個分組，永遠用同一個課室</h3>
+      <p>
+        班別代號已經包含了課室資訊。例如 <strong>DAE101_TW2</strong>，
+        「TW2」代表屯門分校第2號課室，即 <strong>TW - TW2</strong>。
+        所以同一組的所有科目（中文、英文、數學…）都用同一個課室，學生唔使四處走。
+      </p>
+    </div>
+
+    <div class="rule">
+      <div class="rule-icon">1️⃣</div>
+      <div>
+        <h3>第一選擇：直接用代號對應的課室</h3>
+        <p>DAE101_TW2 → 用 TW - TW2</p>
+      </div>
+    </div>
+    <div class="rule">
+      <div class="rule-icon">2️⃣</div>
+      <div>
+        <h3>如果對應課室已被其他班佔用</h3>
+        <p>找同一個分校（TW 中心）最大的空置課室，確保座位夠用</p>
+      </div>
+    </div>
+    <div class="rule">
+      <div class="rule-icon">3️⃣</div>
+      <div>
+        <h3>如果整個分校都滿了</h3>
+        <p>全校範圍找一個座位夠用的空置課室（比較少見）</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- STEP 2 — TIME LOGIC -->
+  <div class="section">
+    <div class="sec-label">時間怎麼選</div>
+    <h2>先 Monday，然後輪流分配</h2>
+
+    <p>系統優先把班排在受歡迎的日子，次序如下：</p>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 20px">
+      <span style="background:#1e40af;color:#fff;padding:8px 18px;border-radius:8px;font-weight:700">① Mon</span>
+      <span style="font-size:1.2rem;padding:8px 0;color:#94a3b8">→</span>
+      <span style="background:#2563eb;color:#fff;padding:8px 18px;border-radius:8px;font-weight:700">② Tue</span>
+      <span style="font-size:1.2rem;padding:8px 0;color:#94a3b8">→</span>
+      <span style="background:#3b82f6;color:#fff;padding:8px 18px;border-radius:8px;font-weight:700">③ Thu</span>
+      <span style="font-size:1.2rem;padding:8px 0;color:#94a3b8">→</span>
+      <span style="background:#93c5fd;color:#1e3a8a;padding:8px 18px;border-radius:8px;font-weight:700">④ Wed</span>
+      <span style="font-size:1.2rem;padding:8px 0;color:#94a3b8">→</span>
+      <span style="background:#dbeafe;color:#1e3a8a;padding:8px 18px;border-radius:8px;font-weight:700">⑤ Fri</span>
+    </div>
+
+    <div class="analogy">
+      <div class="emoji">🃏</div>
+      <h3>問題：如果所有數學班都搶 Monday 呢？</h3>
+      <p>
+        假設數學有 28 班，全部都想排 Monday——但 Monday 只有 6 位數學老師，
+        最多同時教 6 班。如果 28 班全塞進 Monday，老師根本不夠用。
+      </p>
+    </div>
+
+    <p><strong>解決方法：「輪流發牌」</strong></p>
+    <p>就像發撲克牌一樣，每班數學輪流從不同的日子開始嘗試，確保平均分佈到每一天：</p>
+
+    <div class="deal-wrap">
+      <div style="display:flex;gap:8px;padding:10px 0;font-size:.8rem;font-weight:700;color:#64748b;border-bottom:2px solid #e2e8f0">
+        <div style="width:130px">班別</div>
+        <div>優先嘗試的日子</div>
+      </div>
+      <div class="deal-row">
+        <div class="deal-class">DAE103_TW1（第1班）</div>
+        <span class="deal-card dc-mon">Mon 優先</span>
+        <span class="deal-label">→ 排到 Monday</span>
+      </div>
+      <div class="deal-row">
+        <div class="deal-class">DAE103_TW2（第2班）</div>
+        <span class="deal-card dc-tue">Tue 優先</span>
+        <span class="deal-label">→ 排到 Tuesday</span>
+      </div>
+      <div class="deal-row">
+        <div class="deal-class">DAE103_KT1（第3班）</div>
+        <span class="deal-card dc-thu">Thu 優先</span>
+        <span class="deal-label">→ 排到 Thursday</span>
+      </div>
+      <div class="deal-row">
+        <div class="deal-class">DAE103_CS1（第4班）</div>
+        <span class="deal-card dc-wed">Wed 優先</span>
+        <span class="deal-label">→ 排到 Wednesday</span>
+      </div>
+      <div class="deal-row">
+        <div class="deal-class">DAE103_ST1（第5班）</div>
+        <span class="deal-card dc-fri">Fri 優先</span>
+        <span class="deal-label">→ 排到 Friday</span>
+      </div>
+      <div class="deal-row">
+        <div class="deal-class">DAE103_TM1（第6班）</div>
+        <span class="deal-card dc-mon2">Mon 優先</span>
+        <span class="deal-label">→ 輪回 Monday（另一個時段）</span>
+      </div>
+    </div>
+
+    <div class="key-msg" style="margin-top:20px">
+      結果：28 班數學平均分佈到 5 天，每天約 5-6 班，老師輕鬆搞掂。
+    </div>
+
+    <p style="margin-top:16px">每班的課時是 4 小時（一個上午或一個下午）：</p>
+    <div class="cols2">
+      <div class="card">
+        <div class="card-icon">🌅</div>
+        <h3>上午 block</h3>
+        <p>0900–1100 + 1100–1300（連續兩節）</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌇</div>
+        <h3>下午 block</h3>
+        <p>1400–1600 + 1600–1800（連續兩節）</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- STEP 3 — TEACHER -->
+  <div class="section">
+    <div class="sec-label">老師怎麼分配</div>
+    <h2>三個條件都符合才分配</h2>
+
+    <div class="rule">
+      <div class="rule-icon">✅</div>
+      <div>
+        <h3>條件 1：教得這科</h3>
+        <p>老師在「Teacher load table」裡有登記這個科目，且未超出自己的班數上限（Quota）</p>
+      </div>
+    </div>
+    <div class="rule">
+      <div class="rule-icon">🚫</div>
+      <div>
+        <h3>條件 2：沒有衝突</h3>
+        <p>那個時間段，這位老師沒有在教其他班——同一時間不能身兼兩職</p>
+      </div>
+    </div>
+    <div class="rule">
+      <div class="rule-icon">📅</div>
+      <div>
+        <h3>條件 3：那天有空</h3>
+        <p>老師在「Teacher Availability」表格中沒有標記 N（不可用）</p>
+      </div>
+    </div>
+
+    <div class="analogy" style="margin-top:20px">
+      <div class="emoji">👩‍🏫👨‍🏫👩‍🏫</div>
+      <h3>找到了？太好了。找不到？</h3>
+      <p>
+        主教老師（Lec1）找不到時，系統會放寬「班數上限」再找一次。
+        如果真的沒有人——例如所有數學老師那個時段都有課——才會標記為「未能分配老師」，
+        提醒管理員人手處理。
+      </p>
+    </div>
+
+    <p>每個班找到主教後，系統再找兩位後備（Lec2、Lec3），後備只需不衝突即可。</p>
+  </div>
+
+
+  <!-- RESULT EXAMPLE -->
+  <div class="section">
+    <div class="sec-label">排出來的結果</div>
+    <h2>系統輸出的時間表（例子）</h2>
+
+    <p>以下是系統排好後，Monday 的時間表（節錄）：</p>
+
+    <div class="sched-eg">
+      <div class="sched-hdr">
+        <span>課室</span>
+        <span>0900–1300</span>
+        <span>1400–1800</span>
+        <span></span>
+        <span></span>
+      </div>
+      <div class="sched-row">
+        <div class="sched-cell room">TW - TW1</div>
+        <div class="sched-cell blue">
+          <div>
+            <span class="cell-code">DAE101_TW1</span>
+            <span class="cell-teacher">Mr. Chris Chau</span>
+          </div>
+        </div>
+        <div class="sched-cell green">
+          <div>
+            <span class="cell-code">DAE103_TW1</span>
+            <span class="cell-teacher">Mr. Mike Wong</span>
+          </div>
+        </div>
+        <div class="sched-cell empty"></div>
+        <div class="sched-cell empty"></div>
+      </div>
+      <div class="sched-row">
+        <div class="sched-cell room">TW - TW2</div>
+        <div class="sched-cell empty"></div>
+        <div class="sched-cell amber">
+          <div>
+            <span class="cell-code">DAE102_TW2</span>
+            <span class="cell-teacher">Mr. Peter Lee</span>
+          </div>
+        </div>
+        <div class="sched-cell empty"></div>
+        <div class="sched-cell empty"></div>
+      </div>
+      <div class="sched-row">
+        <div class="sched-cell room">CSW - C1</div>
+        <div class="sched-cell purple">
+          <div>
+            <span class="cell-code">DAE101_CS1</span>
+            <span class="cell-teacher">Ms. Lee Sum Kit</span>
+          </div>
+        </div>
+        <div class="sched-cell empty"></div>
+        <div class="sched-cell empty"></div>
+        <div class="sched-cell empty"></div>
+      </div>
+    </div>
+
+    <p style="font-size:.88rem;color:#64748b;margin-top:-6px">
+      班別、課室、老師都已自動填好，可以直接下載 Excel 使用。
+      如有需要，在網頁上 <mark>直接拖動班格</mark> 或 <mark>點擊老師名字修改</mark>，再重新下載。
+    </p>
+  </div>
+
+
+  <!-- WHAT CAN GO WRONG -->
+  <div class="section">
+    <div class="sec-label">排不到怎麼辦</div>
+    <h2>系統會告訴你哪些班需要人手處理</h2>
+
+    <div class="cols2">
+      <div class="card" style="border-left:4px solid #f59e0b">
+        <div class="card-icon">⚠️</div>
+        <h3>未能分配老師</h3>
+        <p>班別已有時間和課室，但所有合資格老師在那個時段都有課。<br><br>
+        <strong>解決方法：</strong>在網頁時間表拖移這個班到另一時段，或在 Teacher load table 增加老師。</p>
+      </div>
+      <div class="card" style="border-left:4px solid #ef4444">
+        <div class="card-icon">❌</div>
+        <h3>找不到課室</h3>
+        <p>沒有找到座位足夠的課室。<br><br>
+        <strong>解決方法：</strong>在 Centre Room Allocation 補充課室資料，或減少學生人數（換課室）。</p>
+      </div>
+    </div>
+  </div>
+
+
+  <div style="text-align:center;padding-top:32px;border-top:1.5px solid #e2e8f0;color:#94a3b8;font-size:.85rem">
+    HKIT 時間表排班系統 &nbsp;·&nbsp; 如有問題請聯絡系統管理員
+  </div>
+
+</div>
+</body>
+</html>

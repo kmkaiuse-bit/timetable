@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>排班 Constraints 討論清單</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", sans-serif;
+    background: #fff; color: #1e293b; font-size: 14px; line-height: 1.6;
+  }
+
+  /* Print styles */
+  @media print {
+    body { font-size: 12px; }
+    .no-print { display: none; }
+    .page { padding: 20px; }
+    .section { break-inside: avoid; }
+  }
+
+  .page { max-width: 800px; margin: 0 auto; padding: 40px 32px 60px; }
+
+  /* Header */
+  .header {
+    border-bottom: 3px solid #1e40af; padding-bottom: 16px; margin-bottom: 28px;
+  }
+  .header h1 { font-size: 1.4rem; font-weight: 800; color: #0f172a; }
+  .header .meta {
+    display: flex; gap: 24px; margin-top: 8px; font-size: .82rem; color: #64748b;
+  }
+  .header .meta span::before { content: "▸ "; color: #1e40af; }
+
+  /* Section */
+  .section { margin-bottom: 28px; }
+  .section-title {
+    display: flex; align-items: center; gap: 10px;
+    background: #f1f5f9; padding: 8px 14px; border-radius: 6px;
+    margin-bottom: 2px;
+  }
+  .section-title h2 { font-size: .9rem; font-weight: 800; color: #0f172a; }
+  .badge {
+    padding: 2px 10px; border-radius: 20px;
+    font-size: .7rem; font-weight: 700; letter-spacing: .04em;
+  }
+  .badge-hard { background: #fee2e2; color: #dc2626; }
+  .badge-soft { background: #fef3c7; color: #b45309; }
+  .badge-logic { background: #dbeafe; color: #1e40af; }
+
+  /* Constraint rows */
+  table {
+    width: 100%; border-collapse: collapse; font-size: .86rem;
+  }
+  th {
+    background: #f8fafc; color: #475569;
+    padding: 7px 12px; text-align: left;
+    font-size: .75rem; font-weight: 700;
+    border-bottom: 1.5px solid #e2e8f0;
+  }
+  td {
+    padding: 9px 12px; border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  .col-no    { width: 36px; color: #94a3b8; font-weight: 700; font-size: .8rem; }
+  .col-rule  { width: 42%; font-weight: 600; color: #0f172a; }
+  .col-note  { width: 16%; }
+  .col-qa    { width: 34%; }
+
+  .rule-sub  { font-size: .8rem; color: #64748b; font-weight: 400; margin-top: 3px; }
+
+  .status {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: .72rem; font-weight: 700;
+  }
+  .s-ok      { background: #dcfce7; color: #15803d; }
+  .s-tbc     { background: #fef9c3; color: #92400e; }
+  .s-issue   { background: #fee2e2; color: #dc2626; }
+
+  .qa-box {
+    border: 1px dashed #cbd5e1; border-radius: 6px;
+    padding: 6px 10px; min-height: 40px;
+    font-size: .78rem; color: #94a3b8;
+  }
+
+  /* Summary box */
+  .summary {
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 28px;
+  }
+  .summary h2 { font-size: .88rem; font-weight: 700; margin-bottom: 10px; color: #0f172a; }
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  }
+  .sum-item {
+    text-align: center; padding: 10px;
+    background: #fff; border-radius: 8px; border: 1px solid #e2e8f0;
+  }
+  .sum-num { font-size: 1.6rem; font-weight: 800; }
+  .sum-label { font-size: .75rem; color: #64748b; }
+  .sum-item.hard .sum-num { color: #dc2626; }
+  .sum-item.soft .sum-num { color: #d97706; }
+  .sum-item.logic .sum-num { color: #1e40af; }
+
+  /* Print button */
+  .print-btn {
+    display: block; margin: 0 auto 28px; padding: 9px 24px;
+    background: #1e40af; color: #fff; border: none; border-radius: 6px;
+    font-size: .88rem; font-weight: 600; cursor: pointer;
+  }
+  .print-btn:hover { background: #1d4ed8; }
+
+  /* Divider */
+  .divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
+
+  /* Legend */
+  .legend {
+    display: flex; gap: 16px; font-size: .78rem; color: #64748b;
+    margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Print button -->
+  <button class="print-btn no-print" onclick="window.print()">列印 / 另存 PDF</button>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>排班 Constraints 討論清單</h1>
+    <div class="meta">
+      <span>日期：___________</span>
+      <span>出席：___________</span>
+      <span>紀錄：___________</span>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary">
+    <h2>本次討論範圍</h2>
+    <div class="summary-grid">
+      <div class="sum-item hard">
+        <div class="sum-num">9</div>
+        <div class="sum-label">Hard Constraints<br>（絕對不能違反）</div>
+      </div>
+      <div class="sum-item soft">
+        <div class="sum-num">4</div>
+        <div class="sum-label">Soft Constraints<br>（盡量符合）</div>
+      </div>
+      <div class="sum-item logic">
+        <div class="sum-num">2</div>
+        <div class="sum-label">特別邏輯<br>（CC Combine）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend no-print">
+    <div class="legend-item"><span class="status s-ok">確認</span> 已達共識</div>
+    <div class="legend-item"><span class="status s-tbc">待確認</span> 需進一步討論</div>
+    <div class="legend-item"><span class="status s-issue">問題</span> 有異議或衝突</div>
+  </div>
+
+
+  <!-- ── HARD CONSTRAINTS ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="badge badge-hard">HARD</span>
+      <h2>絕對不能違反的規則 — 違反即排班失敗</h2>
+    </div>
+
+    <table>
+      <tr>
+        <th class="col-no">#</th>
+        <th class="col-rule">規則</th>
+        <th class="col-note">狀態</th>
+        <th class="col-qa">問題 / 備注</th>
+      </tr>
+      <tr>
+        <td class="col-no">H1</td>
+        <td>
+          老師不能同一時段教兩班
+          <div class="rule-sub">同一老師同一天同一時段只能有一個班（主教 Lec1）</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">H2</td>
+        <td>
+          課室不能同時用兩班
+          <div class="rule-sub">同一課室同一時段只排一班；不可超出座位上限</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">H3</td>
+        <td>
+          Core 科上課地點 = 學生報名 Campus
+          <div class="rule-sub">學生在哪個 center 報名，Core 科就在那個 center 上課</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">H4</td>
+        <td>
+          老師每週最多 6 節
+          <div class="rule-sub">以「節」計算（1節 = 2小時）；個別老師可另行設定</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">H5</td>
+        <td>
+          CC Combine 條件：同科目 + 同語言
+          <div class="rule-sub">只有同科目代號且同授課語言（中/英）才能合班</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">H6</td>
+        <td>
+          TKO Center 特別時段
+          <div class="rule-sub">TKO 只可排 10:00–14:00 或 15:00–19:00（冷氣費問題）；老師+學生均適用</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">H7</td>
+        <td>
+          老師需具備教授該科目資格
+          <div class="rule-sub">Teacher Load Table 內有登記，且未超出個人 Loading 上限</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">H8</td>
+        <td>
+          老師同一天不能去兩個 Center
+          <div class="rule-sub">絕對不允許，不設例外；分配老師時必須檢查</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">H9</td>
+        <td>
+          學生同一天不能去兩個 Center
+          <div class="rule-sub">排班時需確保：同一學生當天所有課都在同一個 Center</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+    </table>
+  </div>
+
+
+  <!-- ── SOFT CONSTRAINTS ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="badge badge-soft">SOFT</span>
+      <h2>盡量符合的規則 — 違反時發出警告</h2>
+    </div>
+
+    <table>
+      <tr>
+        <th class="col-no">#</th>
+        <th class="col-rule">規則</th>
+        <th class="col-note">狀態</th>
+        <th class="col-qa">問題 / 備注</th>
+      </tr>
+      <tr>
+        <td class="col-no">S1</td>
+        <td>
+          老師不可用時間（Preference）
+          <div class="rule-sub">老師申報不許可的時段，系統優先跳過；萬不得已才排入並發警告</div>
+        </td>
+        <td><span class="status s-tbc">待確認</span></td>
+        <td><div class="qa-box">老師如何申報不可用時間？填表格？系統內選擇？</div></td>
+      </tr>
+      <tr>
+        <td class="col-no">S2</td>
+        <td>
+          不要天地堂
+          <div class="rule-sub">同一半天（AM 或 PM）內，兩堂課之間空堂 &gt;2小時 = 天地堂；午飯時間不計；老師+學生均適用</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">S3</td>
+        <td>
+          班別平均分佈至每天（輪流發牌）
+          <div class="rule-sub">同科目多班，輪流從不同日子（Mon→Tue→Thu→Wed→Fri）開始排，避免集中某天</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">S4</td>
+        <td>
+          CC Combine 地點選人數最多的 Center
+          <div class="rule-sub">以減少學生移動為原則；平局時選距 SSP/CSW 較近者；受 H9 約束</div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+    </table>
+  </div>
+
+
+  <!-- ── CC COMBINE LOGIC ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="badge badge-logic">LOGIC</span>
+      <h2>CC Combine 特別邏輯</h2>
+    </div>
+
+    <table>
+      <tr>
+        <th class="col-no">#</th>
+        <th class="col-rule">邏輯</th>
+        <th class="col-note">狀態</th>
+        <th class="col-qa">問題 / 備注</th>
+      </tr>
+      <tr>
+        <td class="col-no">L1</td>
+        <td>
+          方法 A：先排 Core，再為 CC 找合適日子
+          <div class="rule-sub">
+            CC combine 班只排在「所有相關學生當天沒有 Core 科在其他 Center」的日子。<br>
+            找到合適日子 → 排定，完成。
+          </div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+      <tr>
+        <td class="col-no">L2</td>
+        <td>
+          方法 B：調整 Combine 地點（備用）
+          <div class="rule-sub">
+            方法 A 無解時，改以次多學生 Center 為 combine 地點，重新搜尋。<br>
+            全部失敗 → 標記 ERROR，人手處理。
+          </div>
+        </td>
+        <td><span class="status s-ok">確認</span></td>
+        <td><div class="qa-box"></div></td>
+      </tr>
+    </table>
+  </div>
+
+
+  <hr class="divider">
+
+
+  <!-- ── OPEN ISSUES ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="badge badge-soft" style="background:#fce7f3;color:#9d174d">待解決</span>
+      <h2>會議中提出的問題 / 需跟進事項</h2>
+    </div>
+
+    <table>
+      <tr>
+        <th style="width:36px">#</th>
+        <th style="width:20%">相關規則</th>
+        <th>問題描述</th>
+        <th style="width:22%">負責人 / 期限</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>S1</td>
+        <td><div class="qa-box" style="min-height:36px">老師不可用時間的輸入格式待定</div></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+        <td><div class="qa-box" style="min-height:36px"></div></td>
+      </tr>
+    </table>
+  </div>
+
+
+  <!-- ── SIGN OFF ── -->
+  <div style="margin-top:32px;display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:.83rem;">
+    <div>
+      <div style="color:#64748b;margin-bottom:4px">出席者確認</div>
+      <div style="border-bottom:1px solid #cbd5e1;padding-bottom:32px;"></div>
+      <div style="color:#94a3b8;font-size:.75rem;margin-top:4px">簽名 / 日期</div>
+    </div>
+    <div>
+      <div style="color:#64748b;margin-bottom:4px">下次會議日期</div>
+      <div style="border-bottom:1px solid #cbd5e1;padding-bottom:32px;"></div>
+      <div style="color:#94a3b8;font-size:.75rem;margin-top:4px">_____ 年 _____ 月 _____ 日</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

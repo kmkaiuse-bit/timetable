@@ -1,5 +1,13 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Generated outputs
 Timetable_Output.xlsx
+data/output/
+
+# Office temp/lock files
+~$*
+
+# Misc
 .claude/
