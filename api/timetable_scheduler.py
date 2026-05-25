@@ -142,6 +142,17 @@ _TKO_SINGLE_SLOTS = [
 # H4: soft weekly loading cap (warn if exceeded, never block)
 _TEACHER_WEEKLY_SESSION_CAP = 6
 
+# H8: max travel time (minutes) allowed for teacher to work two centres same day
+# Cross-centre pairs within this threshold → soft warning; beyond → hard block
+_H8_MAX_TRAVEL_MIN = 90
+
+# H3 TS→TM exception: set True when Jo confirms the rule is active (pending J1)
+_TS_TM_ENABLED = False
+
+# CC Combine: max travel time (minutes) from any group's home centre to the CC centre
+# None = no distance filter (default until Jo confirms threshold, pending J2)
+_CC_MAX_TRAVEL_MIN = None
+
 # H9: cross-centre pairs that are allowed on the same day (student exceptions v6)
 _H9_ALLOWED_CROSS_CENTRE = {
     frozenset({"CSW", "SSP"}),  # CSW ↔ SSP bidirectional
@@ -162,6 +173,29 @@ _CENTRE_RANK = {
     "TM":  2,
     "FL":  1,
 }
+
+# Estimated MTR travel time in minutes between centres (symmetric, ±5 min accuracy)
+_TRAVEL_TIME: dict = {
+    "SSP": {"SSP":  0, "CSW":  8, "WT": 12, "KT": 25, "TKO": 35, "ST": 30, "FL": 55, "SW": 20, "TW": 15, "TS": 20, "TM": 50},
+    "CSW": {"SSP":  8, "CSW":  0, "WT": 10, "KT": 22, "TKO": 30, "ST": 28, "FL": 50, "SW": 18, "TW": 15, "TS": 22, "TM": 48},
+    "WT":  {"SSP": 12, "CSW": 10, "WT":  0, "KT": 20, "TKO": 25, "ST": 25, "FL": 45, "SW": 15, "TW": 20, "TS": 25, "TM": 45},
+    "KT":  {"SSP": 25, "CSW": 22, "WT": 20, "KT":  0, "TKO": 12, "ST": 35, "FL": 40, "SW": 30, "TW": 35, "TS": 35, "TM": 55},
+    "TKO": {"SSP": 35, "CSW": 30, "WT": 25, "KT": 12, "TKO":  0, "ST": 45, "FL": 50, "SW": 40, "TW": 45, "TS": 40, "TM": 65},
+    "ST":  {"SSP": 30, "CSW": 28, "WT": 25, "KT": 35, "TKO": 45, "ST":  0, "FL": 35, "SW": 20, "TW": 30, "TS": 30, "TM": 45},
+    "FL":  {"SSP": 55, "CSW": 50, "WT": 45, "KT": 40, "TKO": 50, "ST": 35, "FL":  0, "SW": 30, "TW": 45, "TS": 45, "TM": 80},
+    "SW":  {"SSP": 20, "CSW": 18, "WT": 15, "KT": 30, "TKO": 40, "ST": 20, "FL": 30, "SW":  0, "TW": 25, "TS": 25, "TM": 50},
+    "TW":  {"SSP": 15, "CSW": 15, "WT": 20, "KT": 35, "TKO": 45, "ST": 30, "FL": 45, "SW": 25, "TW":  0, "TS": 10, "TM": 35},
+    "TS":  {"SSP": 20, "CSW": 22, "WT": 25, "KT": 35, "TKO": 40, "ST": 30, "FL": 45, "SW": 25, "TW": 10, "TS":  0, "TM": 30},
+    "TM":  {"SSP": 50, "CSW": 48, "WT": 45, "KT": 55, "TKO": 65, "ST": 45, "FL": 80, "SW": 50, "TW": 35, "TS": 30, "TM":  0},
+}
+
+
+def _travel_mins(centre_a: str, centre_b: str) -> int:
+    """Return estimated MTR travel time in minutes between two centres."""
+    if centre_a == centre_b:
+        return 0
+    return _TRAVEL_TIME.get(centre_a, {}).get(centre_b, 999)
+
 
 # Slot order within the day (for S2 天地堂 check)
 _SLOT_HALF_DAY = {
@@ -472,11 +506,21 @@ def _group_to_room_centre(group_code: str) -> str:
     return _GROUP_CENTRE_ALIAS.get(prefix, prefix)
 
 
+def _allowed_centres_for_group(group_code: str) -> list:
+    """Return allowed room centres for a group (primary first).
+    With _TS_TM_ENABLED, TS groups may also use TM rooms as fallback.
+    """
+    primary = _group_to_room_centre(group_code)
+    if _TS_TM_ENABLED and primary == "TS":
+        return ["TS", "TM"]
+    return [primary]
+
+
 def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) -> Optional[str]:
     """
     Return the preferred room for a class group.
     1. Exact match from group code  (TW2 → TW-TW2, CS1 → CSW-C1)
-    2. Largest room at home centre with enough seats
+    2. Largest room at allowed centres with enough seats (TS→TM if _TS_TM_ENABLED)
     3. Any room with enough seats (last resort)
     """
     centre    = _group_to_room_centre(group_code)
@@ -492,14 +536,15 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
             if row:
                 return row[0]
 
-    # Fallback: largest room at home centre
-    row = conn.execute("""
-        SELECT code FROM rooms
-        WHERE centre = ? AND capacity >= ?
-        ORDER BY capacity DESC LIMIT 1
-    """, (centre, student_count)).fetchone()
-    if row:
-        return row[0]
+    # Fallback: largest room at each allowed centre
+    for allowed_centre in _allowed_centres_for_group(group_code):
+        row = conn.execute("""
+            SELECT code FROM rooms
+            WHERE centre = ? AND capacity >= ?
+            ORDER BY capacity DESC LIMIT 1
+        """, (allowed_centre, student_count)).fetchone()
+        if row:
+            return row[0]
 
     # Last resort: any room
     row = conn.execute("""
@@ -796,6 +841,23 @@ def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
 
         # S4 / L1 / L2: try each centre in preference order
         centre_order = _select_cc_centre(conn, codes)
+
+        # CC distance filter: remove centres too far from any group's home (pending J2)
+        if _CC_MAX_TRAVEL_MIN is not None:
+            home_centres = set()
+            for code in codes:
+                row = conn.execute("""
+                    SELECT cg.centre FROM classes c
+                    JOIN class_groups cg ON cg.code = c.group_code
+                    WHERE c.code = ?
+                """, (code,)).fetchone()
+                if row:
+                    home_centres.add(row[0])
+            centre_order = [
+                c for c in centre_order
+                if all(_travel_mins(home, c) <= _CC_MAX_TRAVEL_MIN for home in home_centres)
+            ]
+
         scheduled    = False
 
         for centre in centre_order:
@@ -940,20 +1002,35 @@ def assign_teachers(conn: sqlite3.Connection):
 
         if not lec1:
             unassigned.append(code)
-        elif warn_reason:
+        else:
             teacher_name = conn.execute(
                 "SELECT name FROM teachers WHERE id=?", (lec1,)).fetchone()
-            warnings.append({
-                "class":   code,
-                "teacher": teacher_name[0] if teacher_name else str(lec1),
-                "day":     day,
-                "reason":  warn_reason,
-            })
+            t_name = teacher_name[0] if teacher_name else str(lec1)
+            if warn_reason:
+                warnings.append({
+                    "class":   code,
+                    "teacher": t_name,
+                    "day":     day,
+                    "reason":  warn_reason,
+                })
+            # H8 soft warning: teacher crosses centres but travel time is acceptable
+            if current_centre:
+                committed = _get_teacher_day_centre(conn, lec1, day)
+                if committed and committed != current_centre:
+                    mins = _travel_mins(committed, current_centre)
+                    warnings.append({
+                        "class":   code,
+                        "teacher": t_name,
+                        "day":     day,
+                        "reason":  f"H8 (soft): cross-centre {committed}↔{current_centre} ({mins} min travel)",
+                    })
 
         lec2 = _find_teacher(conn, subj, day, starts, exclude=[lec1],
-                             use_quota=False, ignore_h4_cap=True) if lec1 else None
+                             use_quota=False, ignore_h4_cap=True,
+                             current_centre=current_centre) if lec1 else None
         lec3 = _find_teacher(conn, subj, day, starts, exclude=[lec1, lec2],
-                             use_quota=False) if lec2 else None
+                             use_quota=False,
+                             current_centre=current_centre) if lec2 else None
 
         conn.execute("""
             UPDATE schedule SET teacher1_id=?, teacher2_id=?, teacher3_id=?
@@ -968,6 +1045,17 @@ def assign_teachers(conn: sqlite3.Connection):
 
     conn.commit()
     return unassigned, warnings
+
+
+def _get_teacher_day_centre(conn, teacher_id: int, day: str):
+    """Return the centre a teacher is already committed to on a given day, or None."""
+    row = conn.execute("""
+        SELECT r.centre FROM schedule s
+        JOIN rooms r ON r.code = s.room_code
+        WHERE s.teacher1_id = ? AND s.day = ?
+        LIMIT 1
+    """, (teacher_id, day)).fetchone()
+    return row[0] if row else None
 
 
 def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
@@ -1005,21 +1093,8 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
         """
         h4_params = [_TEACHER_WEEKLY_SESSION_CAP]
 
-    # H8: exclude teachers already at a different centre today
-    h8_filter = ""
-    h8_params = []
-    if current_centre:
-        h8_filter = """
-            AND t.id NOT IN (
-                SELECT s.teacher1_id
-                FROM schedule s
-                JOIN rooms r ON r.code = s.room_code
-                WHERE s.day = ?
-                  AND s.teacher1_id IS NOT NULL
-                  AND r.centre != ?
-            )
-        """
-        h8_params = [day, current_centre]
+    # H8 is now a Python post-filter (travel-time based), not a SQL block.
+    # Teachers at a different centre are excluded if travel time > _H8_MAX_TRAVEL_MIN.
 
     # S1b: centre preference filter (skipped when ignore_centre_pref=True)
     if ignore_centre_pref or not current_centre:
@@ -1072,17 +1147,26 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
           {quota_filter}
           AND t.id NOT IN ({placeholders})
           {h4_filter}
-          {h8_filter}
           {cpref_filter}
           {unavail_filter}
           {dbook_filter}
         ORDER BY ts.lec1_quota DESC
-        LIMIT 1
+        LIMIT 20
     """
     params = ([subject_code] + exclude_safe + h4_params +
-              h8_params + cpref_params + unavail_params + dbook_params)
-    row = conn.execute(query, params).fetchone()
-    return row[0] if row else None
+              cpref_params + unavail_params + dbook_params)
+    rows = conn.execute(query, params).fetchall()
+
+    # H8 post-filter: allow cross-centre only if travel time <= _H8_MAX_TRAVEL_MIN
+    for row in rows:
+        teacher_id = row[0]
+        if current_centre:
+            committed = _get_teacher_day_centre(conn, teacher_id, day)
+            if committed and committed != current_centre:
+                if _travel_mins(committed, current_centre) > _H8_MAX_TRAVEL_MIN:
+                    continue  # hard block: travel too far
+        return teacher_id
+    return None
 
 
 # ─── Phase 4: Collect results ─────────────────────────────────────────────────
@@ -1296,6 +1380,100 @@ def run_from_bytes(excel_bytes: bytes) -> tuple:
     return output_bytes, stats
 
 
+_CADET_DAYS = {"Monday", "Wednesday", "Friday"}
+
+
+def _is_cadet_class(class_code: str) -> bool:
+    """Return True for cadet classes identified by single-letter group code (e.g. DAE256_E)."""
+    parts = class_code.split("_")
+    if len(parts) < 2:
+        return False
+    group = parts[-1]
+    return len(group) == 1 and group.isalpha()
+
+
+def phase0_schedule_cadets(conn: sqlite3.Connection) -> tuple:
+    """
+    Phase 0: Pre-schedule cadet classes (single-letter group code) on Mon/Wed/Fri.
+    Must run before auto_assign_schedule() so their rooms are blocked first.
+    Returns (scheduled_count, error_list).
+    """
+    cadet_classes = [
+        row for row in conn.execute(
+            "SELECT code, group_code, subject_code, student_count FROM classes"
+        ).fetchall()
+        if _is_cadet_class(row["code"])
+    ]
+
+    if not cadet_classes:
+        return 0, []
+
+    scheduled = 0
+    errors: list = []
+
+    for cls in cadet_classes:
+        centre_row = conn.execute(
+            "SELECT centre FROM class_groups WHERE code = ?", (cls["group_code"],)
+        ).fetchone()
+        if not centre_row:
+            errors.append(f"{cls['code']}: no centre found for group {cls['group_code']}")
+            continue
+
+        centre = centre_row[0]
+        room = conn.execute("""
+            SELECT code FROM rooms
+            WHERE centre = ? AND capacity >= ?
+            ORDER BY capacity ASC LIMIT 1
+        """, (centre, cls["student_count"] or 0)).fetchone()
+        if not room:
+            errors.append(f"{cls['code']}: no room at {centre} with capacity >= {cls['student_count']}")
+            continue
+
+        subj = cls["subject_code"]
+        loading = conn.execute(
+            "SELECT loading_hrs FROM subjects WHERE code = ?", (subj,)
+        ).fetchone()
+        loading_hrs = (loading[0] if loading else 4) or 4
+        need_two    = loading_hrs >= 4
+        time_blocks  = _TKO_TIME_BLOCKS if centre == "TKO" else _TIME_BLOCKS
+        single_slots = _TKO_SINGLE_SLOTS if centre == "TKO" else _SINGLE_SLOTS
+
+        assigned = False
+        for day in sorted(_CADET_DAYS, key=lambda d: _DAY_PRIORITY.index(d)):
+            if need_two:
+                for s1, s2 in time_blocks:
+                    if _room_free(conn, room[0], day, s1) and _room_free(conn, room[0], day, s2):
+                        conn.execute(
+                            "INSERT INTO schedule(class_code, group_code, room_code, day, time1) VALUES (?,?,?,?,?)",
+                            (cls["code"], cls["group_code"], room[0], day, s1)
+                        )
+                        conn.execute(
+                            "INSERT INTO schedule(class_code, group_code, room_code, day, time1) VALUES (?,?,?,?,?)",
+                            (cls["code"] + "_slot2", cls["group_code"], room[0], day, s2)
+                        )
+                        scheduled += 1
+                        assigned = True
+                        break
+            else:
+                for s in single_slots:
+                    if _room_free(conn, room[0], day, s):
+                        conn.execute(
+                            "INSERT INTO schedule(class_code, group_code, room_code, day, time1) VALUES (?,?,?,?,?)",
+                            (cls["code"], cls["group_code"], room[0], day, s)
+                        )
+                        scheduled += 1
+                        assigned = True
+                        break
+            if assigned:
+                break
+
+        if not assigned:
+            errors.append(f"{cls['code']}: no free slot on Mon/Wed/Fri at {centre}")
+
+    conn.commit()
+    return scheduled, errors
+
+
 def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     """
     v4 entry point: auto-assigns Day/Time/Room when Class list answer is empty.
@@ -1313,19 +1491,25 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     gc.collect()
 
     if n_sched == 0:
+        # Phase 0: pre-schedule cadet classes (fixed Mon/Wed/Fri rooms)
+        _cadet_count, cadet_errors = phase0_schedule_cadets(conn)
         # Phase A: schedule Core classes (no cc_group)
         auto_assign_schedule(conn, cc_only=False)
         # Phase B: schedule CC Combine classes (cc_group set)
         cc_assigned, cc_errors = cc_assign_schedule(conn)
     else:
+        cadet_errors = []
         cc_errors = []
     # else: Class list answer already filled → use existing schedule as-is
 
     unassigned, s1_warnings = assign_teachers(conn)
     results    = collect_results(conn)
     stats      = collect_stats(conn, results, unassigned, s1_warnings)
-    if cc_errors:
+    all_errors = cadet_errors + cc_errors if n_sched == 0 else []
+    if all_errors:
         stats.setdefault("warnings", [])
+        for e in cadet_errors:
+            stats["warnings"].append({"class": e, "teacher": "", "day": "", "reason": "Cadet Phase0 ERROR"})
         for e in cc_errors:
             stats["warnings"].append({"class": e, "teacher": "", "day": "", "reason": "CC Combine ERROR"})
     del conn
