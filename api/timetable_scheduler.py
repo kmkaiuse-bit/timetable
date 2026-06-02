@@ -1326,7 +1326,8 @@ def collect_results(conn: sqlite3.Connection) -> list:
             t1.name AS lec1, t2.name AS lec2, t3.name AS lec3,
             c.student_count,
             sub.name_cn,
-            sub.name_en
+            sub.name_en,
+            sub.loading_hrs
         FROM schedule s
         LEFT JOIN teachers t1 ON t1.id = s.teacher1_id
         LEFT JOIN teachers t2 ON t2.id = s.teacher2_id
@@ -1447,6 +1448,22 @@ def collect_stats(conn: sqlite3.Connection, results: list,
     unavail = conn.execute(
         "SELECT COUNT(*) FROM teacher_unavailability").fetchone()[0]
 
+    # Teacher loading: sessions + hours per teacher
+    t_sessions: dict = {}
+    t_hours: dict    = {}
+    for r in results:
+        name = r.get("lec1")
+        if not name:
+            continue
+        hrs = r.get("loading_hrs") or 4
+        t_sessions[name] = t_sessions.get(name, 0) + 1
+        t_hours[name]    = t_hours.get(name, 0) + hrs
+    teacher_loading = sorted(
+        [{"name": n, "sessions": t_sessions[n], "hours": t_hours[n]}
+         for n in t_sessions],
+        key=lambda x: -x["hours"]
+    )
+
     # Build timetable grid: day -> room -> slot -> class info
     grid: dict = {}
     for r in results:
@@ -1476,6 +1493,7 @@ def collect_stats(conn: sqlite3.Connection, results: list,
         "unavail_slots":   unavail,
         "preferred_pct":   100,
         "centre_dist":     {},
+        "teacher_loading": teacher_loading,
         "timetable_grid":  grid,
         "results":         results,
     }
