@@ -90,10 +90,12 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 | J1 | H3 | TS→TM exception — this semester or next year? | Flip `_TS_TM_ENABLED = True` |
 | J2 | CC | CC Combine max travel time threshold (minutes)? | Set `_CC_MAX_TRAVEL_MIN = X` |
 | J3 | S3 | Cadet class: exact room codes + Excel detection method? | Complete Phase 0 implementation |
-| J4 | Teacher | English/Local/Net teacher types — scheduling difference? | New logic if needed |
+| J4 | Teacher | English/Local/Net teacher types — scheduling difference? | ✅ Answered 2026-06-02: Net = Barrett + Chris Hon; ≥20 hrs/term/class; 30min travel; CS1-3+CS7 exempt |
 | J5 | Cost | Include teacher price in scheduling? | New optimisation pass |
 | J6 | Teacher | Teacher assignment list — when available? | Teacher auto-assignment can't run without this |
 | J7 | CC | CC grouping full list — when available? | CC Combine can't run without this |
+| J8 | Rooms | FL/SW/TKO/ST/TM centres: classes with students > room capacity — split/relocate/accept? | Fix B6 room overflow; currently these classes unscheduled |
+| J9 | English | 24 Net teacher shortfall warnings — acceptable? Or add Net teachers / change availability? | Reduce/eliminate `English Net shortfall` warnings |
 
 ---
 
@@ -103,7 +105,10 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 |---|-------------|--------|
 | B1 | H8 not enforced for Lec2/Lec3 backup teachers | ✅ Fixed (2026-05-25) |
 | B2 | `is_police_cadet` DB flag set but never read | ⚠️ Superseded by `_is_cadet_class()` — flag can be removed later |
-| B3 | H3 fallback in `_pick_room()` could assign any room | ⚠️ Known; acceptable until H3 explicit gate needed |
+| B3 | H3 fallback in `_pick_room()` could assign any room | ✅ Fixed (2026-06-02) — removed; now returns None |
+| B4 | `phase0_schedule_cadets` inserted fake `_slot2` row | ✅ Fixed (2026-06-02) — uses time1+time2 properly |
+| B5 | `auto_assign_schedule` silently dropped unscheduled classes | ✅ Fixed (2026-06-02) — returns `(count, unscheduled_list)` |
+| B6 | FL/SW/TKO/ST/TM centres have classes exceeding room capacity | ⚠️ Exposed by B3 fix — needs Jo input (J8) |
 
 ---
 
@@ -118,17 +123,18 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 | 2026-05 | V5 | Constraint refinements, CC Combine two-phase |
 | 2026-05-23 | V6 | H4 soft cap, H6 TKO relax, H9 exceptions, S1b centre prefs, S2 students-only |
 | 2026-05-25 | V6.1 | `_TRAVEL_TIME` matrix, H8 soft gate, H3 toggle, S3 Phase 0, CC distance filter |
+| 2026-06-02 | V6.2 | Bug fixes B3/B4/B5, MRV ordering, English Net teacher weekly assignment |
 
 ### Next (unblocked)
 
 | Priority | Item | Blocked by |
 |----------|------|-----------|
-| High | Merge `feat/v6-constraint-improvements` → master | — |
-| High | Get Jo's answers (J1–J7) | Jo |
+| High | Get Jo's answers (J1–J8) | Jo |
+| High | Fix Net teacher shortfall (24 warnings) | Jo — more Net teachers or revised rules |
 | Medium | Activate H3 TS→TM | J1 |
 | Medium | Set CC distance threshold | J2 |
 | Medium | Complete S3 cadet class | J3 |
-| Low | Teacher type logic | J4 |
+| Medium | Fix room capacity overflow (B6) | J8 |
 | Low | Cost optimisation | J5 |
 
 ### Blocked (needs data)
@@ -137,6 +143,7 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 |------|-----------|
 | Teacher auto-assignment end-to-end | J6 (name list) |
 | CC Combine end-to-end | J7 (grouping list) |
+| Room overflow resolution | J8 (Jo decision on FL/SW/TKO/ST/TM capacity) |
 
 ---
 

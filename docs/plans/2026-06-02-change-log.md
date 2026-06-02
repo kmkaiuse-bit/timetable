@@ -85,8 +85,65 @@ ORDER BY
 
 ---
 
+---
+
+## [5] Feat: English Net Teacher Weekly Assignment（DAE102）
+
+**檔案：** `api/timetable_scheduler.py`, `data/input/Planning for Timetable.xlsx`  
+**背景：** Jo 確認英文科需要 Net teacher 安排：每班每學期 ≥20 Net teacher hours（即 3 週段中 ≥2 個由 Net teacher 教）。  
+**改動：**
+
+### 資料層
+- `Planning for Timetable.xlsx` 新增 `Net Teachers` sheet（列出 Net teacher 名單：Mr. Peter Barrett, Mr. Chris Hon）
+- DB schema：`teachers` 表加 `is_net INTEGER DEFAULT 0`
+- 新函數 `_load_net_teachers(conn, wb)` — 讀取 Net Teachers sheet，標記對應老師
+
+### 算法層
+新常數（`timetable_scheduler.py` 頂部，方便調整）：
+```python
+_ENG_SUBJECT_CODE      = "DAE102"
+_ENG_NET_MIN_BLOCKS    = 2          # ≥2 Net blocks per term
+_ENG_MAX_TRAVEL_MIN    = 30         # English teacher travel cap
+_ENG_TERMS             = ["T2025C", "T2026A"]
+_ENG_WEEK_BLOCKS       = ["wk1-5", "wk6-10", "wk11-15"]
+_ENG_NET_EXEMPT_GROUPS = {"CS1","CS2","CS3","CS7"}
+```
+
+新函數 `assign_english_weekly(conn) -> dict`：
+- 為每個 DAE102 班 × 2學期 × 3週段分配老師（共 156 個分配）
+- 優先用 Net teacher，直到達到 _ENG_NET_MIN_BLOCKS；其餘用 local teacher
+- Travel check：英文老師同一天同一週段 travel ≤ 30 min
+- CS1-3, CS7 豁免 Net 要求（_ENG_NET_EXEMPT_GROUPS）
+- 無 Net Teachers sheet → 靜靜跳過 Net 限制（向後相容）
+
+### Output 層
+`write_output_fast()` 加入 `English Weekly` sheet：
+
+| Class Code | Day | Time | Room | T2025C wk1-5 | T2025C wk6-10 | T2025C wk11-15 | T2026A wk1-5 | T2026A wk6-10 | T2026A wk11-15 |
+|---|---|---|---|---|---|---|---|---|---|
+
+### 警告
+Net teacher 不足時，在 `stats["warnings"]` 加入提示：
+```
+English Net shortfall: 1/2 Net blocks in T2025C (insufficient Net teacher supply)
+```
+
+**測試結果：**
+- 156 個週段分配生成（26班 × 6週段）
+- CS1-3, CS7 豁免正確
+- 11 個非豁免班達到 ≥2 Net blocks per term
+- 12 個非豁免班 Net shortfall → 警告（根本原因：2個 Net teachers 時段有限，不足以覆蓋所有 22 個非豁免班）
+- 輸出 Excel 包含 `English Weekly` sheet
+
+**待 Jo 決定：**
+- 24 個 Net shortfall warnings 是否可接受？還是要增加 Net teacher？
+- 這是 `J4`（teacher type 問題）的延伸
+
+---
+
 ## 下一步
 
-- [ ] Merge `feat/v6-constraint-improvements` → `master`
-- [ ] 更新 `MASTER_PLAN.md` 加入 B4/B5 bug 修復記錄
+- [x] Merge `feat/v6-constraint-improvements` → `master` ✓
+- [ ] 更新 `MASTER_PLAN.md`
 - [ ] 新增問題 J8：各 centre 超容量課堂處理方案
+- [ ] 詢問 Jo：Net shortfall 如何處理（增加 Net teachers / 調整時間 / 接受豁免更多班）

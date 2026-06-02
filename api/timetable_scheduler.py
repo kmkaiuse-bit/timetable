@@ -56,7 +56,8 @@ CREATE TABLE teacher_centre_preference (
     PRIMARY KEY (teacher_id, centre));
 
 CREATE TABLE teachers (
-    id INTEGER PRIMARY KEY, name TEXT UNIQUE);
+    id INTEGER PRIMARY KEY, name TEXT UNIQUE,
+    is_net INTEGER DEFAULT 0);
 
 CREATE TABLE teacher_subjects (
     teacher_id INTEGER, subject_code TEXT,
@@ -141,6 +142,14 @@ _TKO_SINGLE_SLOTS = [
 
 # H4: soft weekly loading cap (warn if exceeded, never block)
 _TEACHER_WEEKLY_SESSION_CAP = 6
+
+# English Net teacher assignment constants (DAE102 only)
+_ENG_SUBJECT_CODE        = "DAE102"
+_ENG_NET_MIN_BLOCKS      = 2          # ≥2 Net teacher blocks per term per class
+_ENG_MAX_TRAVEL_MIN      = 30         # English teacher same-day travel cap (minutes)
+_ENG_TERMS               = ["T2025C", "T2026A"]
+_ENG_WEEK_BLOCKS         = ["wk1-5", "wk6-10", "wk11-15"]
+_ENG_NET_EXEMPT_GROUPS   = {"CS1", "CS2", "CS3", "CS7"}   # no Net hours requirement
 
 # H8: max travel time (minutes) allowed for teacher to work two centres same day
 # Cross-centre pairs within this threshold → soft warning; beyond → hard block
@@ -448,6 +457,27 @@ def _load_centre_preferences(conn: sqlite3.Connection, wb) -> int:
     return count
 
 
+def _load_net_teachers(conn: sqlite3.Connection, wb) -> int:
+    """
+    Optional sheet 'Net Teachers': one teacher name per row (col A, from row 2).
+    Marks matching teachers as is_net=1 in the teachers table.
+    Sheet absence is silently ignored (returns 0).
+    """
+    if "Net Teachers" not in wb.sheetnames:
+        return 0
+    ws = wb["Net Teachers"]
+    count = 0
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        name = row[0]
+        if not name:
+            continue
+        name = str(name).strip()
+        result = conn.execute(
+            "UPDATE teachers SET is_net=1 WHERE name=?", (name,))
+        count += result.rowcount
+    return count
+
+
 def build_db(wb) -> sqlite3.Connection:
     """
     Build an in-memory SQLite database from an openpyxl workbook.
@@ -460,6 +490,7 @@ def build_db(wb) -> sqlite3.Connection:
     _load_teachers(conn, wb)
     n_unavail  = _load_availability(conn, wb)
     _load_centre_preferences(conn, wb)
+    _load_net_teachers(conn, wb)
     n_schedule = _load_existing_schedule(conn, wb)
     conn.commit()
     return conn, n_schedule, n_unavail
@@ -1182,6 +1213,109 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
     return None
 
 
+# ─── Phase 3b: English Net teacher weekly assignment ─────────────────────────
+
+def assign_english_weekly(conn: sqlite3.Connection) -> dict:
+    """
+    Assign teachers to each English (DAE102) class per term × week-block.
+
+    For each class and each term in _ENG_TERMS:
+      - 3 week-blocks (_ENG_WEEK_BLOCKS)
+      - ≥ _ENG_NET_MIN_BLOCKS blocks must use a Net teacher
+        (unless group_code is in _ENG_NET_EXEMPT_GROUPS)
+      - No teacher double-booked at same (day, time, block)
+      - Travel between centres ≤ _ENG_MAX_TRAVEL_MIN on same day within same block
+
+    Returns dict: {(class_code, term, block): teacher_name or None}
+    If no "Net Teachers" sheet was loaded (all is_net=0), Net constraint is skipped.
+    """
+    from collections import defaultdict
+
+    # All scheduled English classes
+    eng_classes = conn.execute("""
+        SELECT s.class_code, s.day, s.time1, cg.centre, c.group_code
+        FROM schedule s
+        JOIN classes c ON c.code = s.class_code
+        JOIN class_groups cg ON cg.code = c.group_code
+        WHERE c.subject_code = ? AND s.day IS NOT NULL
+        ORDER BY s.day, s.time1, s.class_code
+    """, (_ENG_SUBJECT_CODE,)).fetchall()
+
+    if not eng_classes:
+        return {}
+
+    # Separate Net and local English teachers
+    all_eng = conn.execute("""
+        SELECT t.id, t.name, t.is_net
+        FROM teachers t
+        JOIN teacher_subjects ts ON ts.teacher_id = t.id
+        WHERE ts.subject_code = ?
+        ORDER BY t.is_net DESC, t.name
+    """, (_ENG_SUBJECT_CODE,)).fetchall()
+
+    net_teachers   = [r["id"] for r in all_eng if r["is_net"]]
+    local_teachers = [r["id"] for r in all_eng if not r["is_net"]]
+    id_to_name     = {r["id"]: r["name"] for r in all_eng}
+
+    # No Net teachers loaded → skip Net requirement
+    net_available = bool(net_teachers)
+
+    assignments = {}   # (class_code, term, block) → teacher_id or None
+
+    for term in _ENG_TERMS:
+        # Track assignments within this term:
+        # block_day_used[(block, day)] → set of teacher_ids already used
+        block_day_used = defaultdict(set)
+        # block_centre[(block, teacher_id, day)] → centre (for travel check)
+        block_centre: dict = {}
+
+        for cls in eng_classes:
+            class_code = cls["class_code"]
+            day        = cls["day"]
+            time1      = cls["time1"]
+            centre     = cls["centre"]
+            group      = cls["group_code"]
+            exempt     = group in _ENG_NET_EXEMPT_GROUPS
+
+            need_net   = 0 if (exempt or not net_available) else _ENG_NET_MIN_BLOCKS
+            net_given  = 0
+            block_assignments: list = []
+
+            for block in _ENG_WEEK_BLOCKS:
+                slot_key = (block, day, time1)
+                used     = block_day_used[slot_key]
+
+                # Decide pool order: Net first if still need Net, else local
+                if net_given < need_net:
+                    pool = net_teachers + local_teachers
+                else:
+                    pool = local_teachers + net_teachers
+
+                chosen = None
+                for tid in pool:
+                    if tid in used:
+                        continue
+                    # Travel check: English teacher ≤ 30 min same day same block
+                    committed_centre = block_centre.get((block, tid, day))
+                    if committed_centre and committed_centre != centre:
+                        if _travel_mins(committed_centre, centre) > _ENG_MAX_TRAVEL_MIN:
+                            continue
+                    chosen = tid
+                    break
+
+                assignments[(class_code, term, block)] = chosen
+                if chosen:
+                    used.add(chosen)
+                    block_centre[(block, chosen, day)] = centre
+                    if chosen in net_teachers:
+                        net_given += 1
+
+    # Convert teacher_id → name
+    return {
+        k: id_to_name.get(v) for k, v in assignments.items()
+    }
+
+
 # ─── Phase 4: Collect results ─────────────────────────────────────────────────
 
 def collect_results(conn: sqlite3.Connection) -> list:
@@ -1214,7 +1348,7 @@ _DAY_ABBR    = {"Monday": "Mon", "Tuesday": "Tue", "Wednesday": "Wed",
                 "Thursday": "Thu", "Friday": "Fri"}
 
 
-def write_output_fast(results: list) -> bytes:
+def write_output_fast(results: list, english_weekly: dict = None) -> bytes:
     """Build a new clean workbook from results — no original formatting loaded.
     Runs in < 1 s vs 47 s for the modify-in-place approach."""
     from io import BytesIO
@@ -1265,6 +1399,29 @@ def write_output_fast(results: list) -> bytes:
                 else:
                     row_data.append("")
             ws.append(row_data)
+
+    # ── Sheet 7: English Weekly Teacher Assignment ───────────────────────────
+    if english_weekly:
+        eng_results = [r for r in results if r["name_en"] == _ENG_SUBJECT_CODE
+                       or (r.get("name_en") or "").startswith("English")]
+        # Fallback: match by class_code key in english_weekly
+        coded = {k[0] for k in english_weekly}
+
+        ws_eng = wb.create_sheet("English Weekly")
+        # Header: Class | Day | Time | Room | T2025C wk1-5 | wk6-10 | wk11-15 | T2026A wk1-5 | wk6-10 | wk11-15
+        header = ["Class Code", "Day", "Time", "Room"]
+        for term in _ENG_TERMS:
+            for blk in _ENG_WEEK_BLOCKS:
+                header.append(f"{term} {blk}")
+        ws_eng.append(header)
+
+        eng_rows = [r for r in results if r["class_code"] in coded]
+        for r in sorted(eng_rows, key=lambda x: (x["day"] or "", x["time1"] or "", x["class_code"])):
+            row_data = [r["class_code"], r["day"] or "", r["time1"] or "", r["room_code"] or ""]
+            for term in _ENG_TERMS:
+                for blk in _ENG_WEEK_BLOCKS:
+                    row_data.append(english_weekly.get((r["class_code"], term, blk)) or "")
+            ws_eng.append(row_data)
 
     buf = BytesIO()
     wb.save(buf)
@@ -1516,9 +1673,11 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     # else: Class list answer already filled → use existing schedule as-is
 
     unassigned, s1_warnings = assign_teachers(conn)
-    results    = collect_results(conn)
-    stats      = collect_stats(conn, results, unassigned, s1_warnings)
-    stats["unscheduled_rooms"] = unscheduled_rooms
+    english_weekly = assign_english_weekly(conn)    # Phase 3b
+    results        = collect_results(conn)
+    stats          = collect_stats(conn, results, unassigned, s1_warnings)
+    stats["unscheduled_rooms"]  = unscheduled_rooms
+    stats["english_weekly_count"] = len(english_weekly)
 
     all_errors = cadet_errors + cc_errors if n_sched == 0 else []
     if all_errors:
@@ -1527,10 +1686,34 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
             stats["warnings"].append({"class": e, "teacher": "", "day": "", "reason": "Cadet Phase0 ERROR"})
         for e in cc_errors:
             stats["warnings"].append({"class": e, "teacher": "", "day": "", "reason": "CC Combine ERROR"})
+
+    # Collect Net teacher names before conn is released
+    net_names = {r["name"] for r in conn.execute(
+        "SELECT name FROM teachers WHERE is_net=1").fetchall()}
+
     del conn
     gc.collect()
 
-    output_bytes = write_output_fast(results)
+    # Report English Net teacher shortfalls as warnings (uses net_names, not conn)
+    if english_weekly and net_names:
+        eng_codes = {k[0] for k in english_weekly}
+        for code in sorted(eng_codes):
+            grp = code.split("_")[1] if "_" in code else ""
+            if grp in _ENG_NET_EXEMPT_GROUPS:
+                continue
+            for term in _ENG_TERMS:
+                net_cnt = sum(
+                    1 for blk in _ENG_WEEK_BLOCKS
+                    if english_weekly.get((code, term, blk)) in net_names)
+                if net_cnt < _ENG_NET_MIN_BLOCKS:
+                    stats["warnings"].append({
+                        "class":   code,
+                        "teacher": "",
+                        "day":     term,
+                        "reason":  f"English Net shortfall: {net_cnt}/{_ENG_NET_MIN_BLOCKS} Net blocks in {term} (insufficient Net teacher supply)",
+                    })
+
+    output_bytes = write_output_fast(results, english_weekly=english_weekly)
     return output_bytes, stats
 
 
