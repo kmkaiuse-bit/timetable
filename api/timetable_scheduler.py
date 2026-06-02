@@ -521,14 +521,13 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
     Return the preferred room for a class group.
     1. Exact match from group code  (TW2 → TW-TW2, CS1 → CSW-C1)
     2. Largest room at allowed centres with enough seats (TS→TM if _TS_TM_ENABLED)
-    3. Any room with enough seats (last resort)
+    Returns None if no room fits — caller skips class rather than violating H3.
     """
     centre    = _group_to_room_centre(group_code)
     num_match = re.search(r"\d+$", group_code)
 
     if num_match:
         num = num_match.group()
-        # Standard pattern: CENTRE - CENTREn
         for candidate in (f"{centre} - {centre}{num}",
                           f"{centre} - C{num}"):   # CSW - C1 style
             row = conn.execute(
@@ -546,12 +545,7 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
         if row:
             return row[0]
 
-    # Last resort: any room
-    row = conn.execute("""
-        SELECT code FROM rooms WHERE capacity >= ?
-        ORDER BY capacity ASC LIMIT 1
-    """, (student_count,)).fetchone()
-    return row[0] if row else None
+    return None  # no room at correct centre — do not violate H3 by using wrong centre
 
 
 def _room_free(conn: sqlite3.Connection, room: str, day: str, slot: str) -> bool:
@@ -625,7 +619,7 @@ def _has_tiandi_violation(group_slots: list, new_slot: str) -> bool:
 
 
 def auto_assign_schedule(conn: sqlite3.Connection,
-                          cc_only: bool = False) -> int:
+                          cc_only: bool = False) -> tuple:
     """
     v4/v6: auto-assign Day/Time/Room for every class.
 
@@ -638,17 +632,28 @@ def auto_assign_schedule(conn: sqlite3.Connection,
 
     cc_only=True  → only process classes that have a cc_group set (Phase B)
     cc_only=False → only process classes with cc_group IS NULL (Phase A, default)
+
+    Returns (scheduled_count, unscheduled_list).
+    unscheduled_list entries: {"code": ..., "reason": ...}
     """
     from collections import defaultdict
 
     cc_filter = "IS NOT NULL" if cc_only else "IS NULL"
+    # MRV ordering: most-constrained classes first.
+    # TKO first (limited time windows), then 4-hr blocks (need two consecutive free slots),
+    # then by student count desc (larger classes harder to fit), then code for stability.
     classes = conn.execute(f"""
         SELECT c.code, c.group_code, c.student_count, c.subject_code,
-               sub.loading_hrs
+               sub.loading_hrs, cg.centre
         FROM classes c
         JOIN subjects sub ON sub.code = c.subject_code
+        JOIN class_groups cg ON cg.code = c.group_code
         WHERE c.cc_group {cc_filter}
-        ORDER BY c.student_count DESC, c.code ASC
+        ORDER BY
+            CASE WHEN cg.centre = 'TKO' THEN 0 ELSE 1 END,
+            CASE WHEN sub.loading_hrs >= 4 THEN 0 ELSE 1 END,
+            c.student_count DESC,
+            c.code ASC
     """).fetchall()
 
     teacher_cap      = _build_teacher_capacity(conn)
@@ -657,7 +662,9 @@ def auto_assign_schedule(conn: sqlite3.Connection,
     group_day_centre = {}                 # (group, day) -> centre  [H9]
     group_day_slots  = defaultdict(list)  # (group, day) -> [slot, ...]  [S2]
 
-    count = 0
+    count       = 0
+    unscheduled = []   # {"code": ..., "reason": ...}
+
     for cls in classes:
         code     = cls["code"]
         group    = cls["group_code"]
@@ -667,6 +674,9 @@ def auto_assign_schedule(conn: sqlite3.Connection,
 
         room = _pick_room(conn, group, students)
         if not room:
+            centre = cls["centre"] if "centre" in cls.keys() else group
+            unscheduled.append({"code": code,
+                                "reason": f"no room at {centre} with capacity >= {students}"})
             continue
 
         # Derive room centre for H9 check
@@ -745,9 +755,12 @@ def auto_assign_schedule(conn: sqlite3.Connection,
 
         if assigned:
             subj_day_offset[subj] = (offset + 1) % len(_DAY_PRIORITY)
+        else:
+            unscheduled.append({"code": code,
+                                "reason": "no free slot across all days (room/teacher capacity exhausted)"})
 
     conn.commit()
-    return count
+    return count, unscheduled
 
 
 # ─── Phase 2c: CC Combine scheduling (L1 / L2 / H5 / S4) ────────────────────
@@ -1443,24 +1456,22 @@ def phase0_schedule_cadets(conn: sqlite3.Connection) -> tuple:
             if need_two:
                 for s1, s2 in time_blocks:
                     if _room_free(conn, room[0], day, s1) and _room_free(conn, room[0], day, s2):
-                        conn.execute(
-                            "INSERT INTO schedule(class_code, group_code, room_code, day, time1) VALUES (?,?,?,?,?)",
-                            (cls["code"], cls["group_code"], room[0], day, s1)
-                        )
-                        conn.execute(
-                            "INSERT INTO schedule(class_code, group_code, room_code, day, time1) VALUES (?,?,?,?,?)",
-                            (cls["code"] + "_slot2", cls["group_code"], room[0], day, s2)
-                        )
+                        conn.execute("""
+                            INSERT OR REPLACE INTO schedule
+                                (class_code, group_code, day, time1, time2, room_code)
+                            VALUES (?,?,?,?,?,?)
+                        """, (cls["code"], cls["group_code"], day, s1, s2, room[0]))
                         scheduled += 1
                         assigned = True
                         break
             else:
                 for s in single_slots:
                     if _room_free(conn, room[0], day, s):
-                        conn.execute(
-                            "INSERT INTO schedule(class_code, group_code, room_code, day, time1) VALUES (?,?,?,?,?)",
-                            (cls["code"], cls["group_code"], room[0], day, s)
-                        )
+                        conn.execute("""
+                            INSERT OR REPLACE INTO schedule
+                                (class_code, group_code, day, time1, time2, room_code)
+                            VALUES (?,?,?,?,NULL,?)
+                        """, (cls["code"], cls["group_code"], day, s, room[0]))
                         scheduled += 1
                         assigned = True
                         break
@@ -1490,21 +1501,25 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     del wb_read
     gc.collect()
 
+    unscheduled_rooms = []
     if n_sched == 0:
         # Phase 0: pre-schedule cadet classes (fixed Mon/Wed/Fri rooms)
         _cadet_count, cadet_errors = phase0_schedule_cadets(conn)
         # Phase A: schedule Core classes (no cc_group)
-        auto_assign_schedule(conn, cc_only=False)
+        _core_count, core_unscheduled = auto_assign_schedule(conn, cc_only=False)
+        unscheduled_rooms.extend(core_unscheduled)
         # Phase B: schedule CC Combine classes (cc_group set)
         cc_assigned, cc_errors = cc_assign_schedule(conn)
     else:
         cadet_errors = []
-        cc_errors = []
+        cc_errors    = []
     # else: Class list answer already filled → use existing schedule as-is
 
     unassigned, s1_warnings = assign_teachers(conn)
     results    = collect_results(conn)
     stats      = collect_stats(conn, results, unassigned, s1_warnings)
+    stats["unscheduled_rooms"] = unscheduled_rooms
+
     all_errors = cadet_errors + cc_errors if n_sched == 0 else []
     if all_errors:
         stats.setdefault("warnings", [])
