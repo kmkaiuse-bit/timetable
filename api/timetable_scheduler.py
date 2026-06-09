@@ -1895,6 +1895,10 @@ def collect_stats(conn: sqlite3.Connection, results: list,
                     "students":   r.get("student_count") or 0,
                 }
 
+    # All rooms sorted by centre then code — for grid display (includes empty rooms)
+    all_rooms = [r["code"] for r in conn.execute(
+        "SELECT code FROM rooms ORDER BY centre, code").fetchall()]
+
     return {
         "scheduled":       lec1,
         "total_classes":   total,
@@ -1908,6 +1912,7 @@ def collect_stats(conn: sqlite3.Connection, results: list,
         "centre_dist":     {},
         "teacher_loading": teacher_loading,
         "timetable_grid":  grid,
+        "all_rooms":       all_rooms,
         "results":         results,
     }
 

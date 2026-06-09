@@ -577,7 +577,7 @@
     generateBtn.disabled = false;
   }
 
-  const state = { results: [], editedCodes: new Set(), crossCentreMap: {} };
+  const state = { results: [], editedCodes: new Set(), crossCentreMap: {}, allRooms: [] };
 
   // Build cross-centre map: classCode → {from, to}  (used by grid + issues panel)
   function buildCrossCentreMap(assumptions) {
@@ -591,6 +591,7 @@
   function renderResults(stats) {
     state.results = stats.results || []; state.editedCodes = new Set(); updateEditBadge();
     state.crossCentreMap = buildCrossCentreMap(stats.assumptions);
+    state.allRooms = stats.all_rooms || [];
     const total = stats.total_classes, sched = stats.scheduled;
     const trueTotal = stats.true_total || total;
     const unscheduledCount = trueTotal - total;
@@ -862,14 +863,28 @@
   }
 
   function showDayGrid(day) {
-    const dayData=_grid[day]||{}, rooms=Object.keys(dayData).sort();
-    if(!rooms.length){document.getElementById('gridContainer').innerHTML='<p style="color:#94a3b8;font-size:.85rem;padding:8px 0">No classes on this day.</p>';return;}
-    let minT=Infinity,maxT=-Infinity;
-    rooms.forEach(r=>buildRoomBlocks(dayData[r]||{}).forEach(b=>{minT=Math.min(minT,b.start);maxT=Math.max(maxT,b.end);}));
+    const dayData=_grid[day]||{};
+    // Use all_rooms (full room list from backend) so empty rooms are shown too
+    const allRooms=state.allRooms||Object.keys(dayData).sort();
+    if(!allRooms.length){document.getElementById('gridContainer').innerHTML='<p style="color:#94a3b8;font-size:.85rem;padding:8px 0">No rooms configured.</p>';return;}
+
+    // Compute time range from occupied rooms only; fallback to 09:00–18:00
+    let minT=540,maxT=1080;
+    allRooms.forEach(r=>buildRoomBlocks(dayData[r]||{}).forEach(b=>{minT=Math.min(minT,b.start);maxT=Math.max(maxT,b.end);}));
     minT=Math.floor(minT/GRID_STEP)*GRID_STEP; maxT=Math.ceil(maxT/GRID_STEP)*GRID_STEP;
     const cols=[]; for(let t=minT;t<maxT;t+=GRID_STEP)cols.push(t);
     const thead=`<tr><th>Room</th>${cols.map(t=>{const onHour=t%60===0;return `<th style="min-width:34px;font-size:.62rem;${onHour?'font-weight:700':'color:#94a3b8;font-weight:400'}">${minsToLabel(t)}</th>`;}).join('')}</tr>`;
-    const tbody=rooms.map(room=>{
+
+    // Group rooms by centre (prefix before " - ")
+    let prevCentre='';
+    const tbody=allRooms.map(room=>{
+      const centre=room.split(' - ')[0]||room;
+      let centreHeader='';
+      if(centre!==prevCentre){
+        prevCentre=centre;
+        const hasClasses=allRooms.filter(r=>(r.split(' - ')[0]||r)===centre).some(r=>Object.keys(dayData[r]||{}).length>0);
+        centreHeader=`<tr><td colspan="${cols.length+1}" style="background:#f1f5f9;font-size:.71rem;font-weight:700;color:#475569;padding:3px 8px;border-bottom:1px solid #e2e8f0">${centre}${hasClasses?'':' <span style="font-weight:400;color:#94a3b8">— no classes today</span>'}</td></tr>`;
+      }
       const blocks=buildRoomBlocks(dayData[room]||{}); let cells='',t=minT;
       while(t<maxT){
         const blk=blocks.find(b=>b.start===t);
@@ -896,7 +911,9 @@
           t+=GRID_STEP;
         }
       }
-      return `<tr><td style="white-space:nowrap;font-size:.75rem;padding:5px 8px">${room}</td>${cells}</tr>`;
+      // Show short room label (part after " - ", or full code if no separator)
+      const roomLabel=room.includes(' - ')?room.split(' - ')[1]:room;
+      return centreHeader+`<tr><td style="white-space:nowrap;font-size:.75rem;padding:5px 8px;color:#374151">${roomLabel}</td>${cells}</tr>`;
     }).join('');
     document.getElementById('gridContainer').innerHTML=`<table class="tt-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
     document.querySelectorAll('.cell-lec[contenteditable]').forEach(el=>{
