@@ -89,18 +89,23 @@
     .issues-panel summary { font-size: .88rem; font-weight: 700; cursor: pointer; padding: 10px 14px; background: #fef3c7; border: 1px solid #fde68a; border-radius: var(--r-sm); color: #92400e; user-select: none; display: flex; align-items: center; gap: 6px; list-style: none; }
     .issues-panel summary::-webkit-details-marker { display: none; }
     .issues-panel[open] summary { border-radius: var(--r-sm) var(--r-sm) 0 0; border-bottom: none; }
-    .issues-inner { background: #fff; border: 1px solid #fde68a; border-top: none; border-radius: 0 0 var(--r-sm) var(--r-sm); padding: 12px 14px; }
-    .issue-group-header { font-size: .8rem; font-weight: 700; margin: 10px 0 4px; padding: 3px 8px; border-radius: 4px; }
-    .issue-group-header:first-child { margin-top: 0; }
-    .issue-group-header.data   { background: #fee2e2; color: #991b1b; }
-    .issue-group-header.algo   { background: #e0e7ff; color: #3730a3; }
-    .issue-group-header.assume { background: #d1fae5; color: #065f46; }
-    .issue-row { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid #f3f4f6; font-size: .82rem; }
-    .issue-row:last-child { border-bottom: none; }
-    .issue-code    { font-weight: 600; min-width: 130px; flex-shrink: 0; color: var(--text); }
-    .issue-reason  { color: #374151; flex: 1; }
-    .issue-suggest { color: #6b7280; font-size: .77rem; flex-shrink: 0; max-width: 220px; }
+    .issues-inner { background: #fff; border: 1px solid #fde68a; border-top: none; border-radius: 0 0 var(--r-sm) var(--r-sm); padding: 10px 14px; }
     .issues-badge  { background: #fcd34d; color: #92400e; border-radius: 999px; padding: 1px 8px; font-size: .76rem; font-weight: 700; margin-left: auto; }
+    /* Issues table (Direction A) */
+    .issues-tbl { width: 100%; border-collapse: collapse; font-size: .81rem; }
+    .issues-tbl thead th { font-size: .71rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; padding: 0 8px 6px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    .issues-tbl td { padding: 5px 8px; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+    .issues-tbl tr:last-child td { border-bottom: none; }
+    .issues-tbl tr.i-group td { background: #f8fafc; font-size: .72rem; font-weight: 700; padding: 5px 8px 3px; letter-spacing: .02em; border-bottom: 1px solid #e2e8f0; border-top: 6px solid transparent; }
+    .issues-tbl tr.i-group:first-child td { border-top: none; }
+    .issues-tbl tr.i-group.data   td { color: #991b1b; background: #fff5f5; }
+    .issues-tbl tr.i-group.algo   td { color: #3730a3; background: #f5f3ff; }
+    .issues-tbl tr.i-group.assume td { color: #065f46; background: #f0fdf4; }
+    .i-ctr  { font-weight: 700; color: var(--accent); width: 50px; }
+    .i-code { font-weight: 600; color: var(--text); width: 128px; white-space: nowrap; }
+    .i-stu  { color: #94a3b8; width: 42px; text-align: right; white-space: nowrap; }
+    .i-why  { color: #374151; }
+    .issues-assume-row { font-size: .79rem; color: #065f46; padding: 6px 8px 2px; border-top: 1px solid #e2e8f0; margin-top: 6px; }
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: .84rem; }
     thead tr { background: var(--border-s); }
@@ -661,48 +666,69 @@
     const issues = stats.issues || [];
     const issuesPanel = document.getElementById('issuesPanel');
     const issuesBadge = document.getElementById('issuesBadge');
+
+    const REASON_ZH = {
+      'NO_ROOM_CAPACITY': '課室容量不足，無法安排',
+      'SLOT_ROOM':        '課室全日已佔滿',
+      'SLOT_TEACHER':     '課室空閒但老師時段全滿',
+      'SLOT_H9':          '學生同日有課衝突',
+      'SLOT_H6':          'TKO 可用時段不足 (10:00後)',
+      'TEACHER_NONE':     '找不到合資格老師',
+      'TEACHER_CAPACITY': '老師週課時已達上限',
+      'TEACHER_AVAIL':    '老師當日不可用',
+      'TEACHER_H8':       '老師交通時間超限',
+      'H3_TS_TM':         'J1 假設：已安排 TS→TM 跨中心',
+      'H3_FALLBACK':      'J8 假設：已安排跨中心房間',
+      'NET_SHORTFALL':    'Net 老師未達2節要求',
+      'CADET_ERROR':      'Cadet班無法排入週一/三/五',
+    };
+
+    const CAT_META = {
+      DATA_PROBLEM:    { cls: 'data',   label: '🔴 資料問題 — 需更新輸入資料' },
+      ALGORITHM_ISSUE: { cls: 'algo',   label: '🔵 排班衝突 — 時段/課室未能安排' },
+      ASSUMPTION:      { cls: 'assume', label: '🟡 假設已套用 — 待 Jo 確認' },
+    };
+
     if (issues.length > 0) {
       issuesPanel.style.display = '';
       const uniqueCodes = new Set(issues.map(i => i.code));
       issuesBadge.textContent = uniqueCodes.size;
 
       const groups = { DATA_PROBLEM: [], ALGORITHM_ISSUE: [], ASSUMPTION: [] };
-      issues.forEach(i => {
-        const cat = i.category || 'DATA_PROBLEM';
-        if (groups[cat]) groups[cat].push(i);
-      });
+      issues.forEach(i => { if (groups[i.category]) groups[i.category].push(i); });
 
-      const catLabel = {
-        DATA_PROBLEM:    { cls: 'data',   label: '🔴 Data Problems — needs input data update' },
-        ALGORITHM_ISSUE: { cls: 'algo',   label: '🔵 Scheduling Conflicts — may improve automatically' },
-        ASSUMPTION:      { cls: 'assume', label: '🟡 Assumptions Applied — confirm with Jo' },
-      };
+      let html = `<table class="issues-tbl">
+        <thead><tr>
+          <th>Centre</th><th>班別</th><th>人數</th><th>問題</th>
+        </tr></thead><tbody>`;
 
-      let html = '';
       for (const [cat, items] of Object.entries(groups)) {
         if (!items.length) continue;
-        const { cls, label } = catLabel[cat];
-        html += `<div class="issue-group-header ${cls}">${label} (${items.length})</div>`;
+        const { cls, label } = CAT_META[cat];
+        html += `<tr class="i-group ${cls}"><td colspan="4">${label} (${items.length})</td></tr>`;
         items.forEach(i => {
-          html += `<div class="issue-row">
-            <span class="issue-code" title="${i.code}">${i.code}</span>
-            <span class="issue-reason">${i.reason}</span>
-            <span class="issue-suggest">${i.suggested || ''}</span>
-          </div>`;
+          const why = REASON_ZH[i.reason_code] || i.reason_code;
+          const stu = i.students ? `${i.students}人` : '–';
+          const ctr = i.centre || '–';
+          html += `<tr>
+            <td class="i-ctr">${ctr}</td>
+            <td class="i-code">${i.code}</td>
+            <td class="i-stu">${stu}</td>
+            <td class="i-why">${why}</td>
+          </tr>`;
         });
       }
 
+      html += '</tbody></table>';
+
+      // Assumptions summary (compact)
       const assumptions = stats.assumptions || [];
       if (assumptions.length > 0) {
-        html += `<div class="issue-group-header assume">📋 Assumption Details</div>`;
-        assumptions.forEach(a => {
-          const n = (a.affected || []).length;
-          html += `<div class="issue-row">
-            <span class="issue-code">${a.question}</span>
-            <span class="issue-reason">${a.assumption} (${n} classes)</span>
-            <span class="issue-suggest">Reverse: set _${a.question === 'J1' ? 'TS_TM_ENABLED=False' : 'pick_room fallback off'}</span>
-          </div>`;
-        });
+        html += `<div class="issues-assume-row">📋 假設記錄：`;
+        html += assumptions.map(a =>
+          `<strong>${a.question}</strong> ${a.assumption}（${(a.affected||[]).length}班）`
+        ).join('　');
+        html += `</div>`;
       }
 
       document.getElementById('issuesInner').innerHTML = html;
