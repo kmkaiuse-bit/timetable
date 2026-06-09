@@ -865,8 +865,8 @@
   function showDayGrid(day) {
     const dayData=_grid[day]||{};
     // Use all_rooms (full room list from backend) so empty rooms are shown too
-    const allRooms=state.allRooms||Object.keys(dayData).sort();
-    if(!allRooms.length){document.getElementById('gridContainer').innerHTML='<p style="color:#94a3b8;font-size:.85rem;padding:8px 0">No rooms configured.</p>';return;}
+    const allRooms=(state.allRooms&&state.allRooms.length)?state.allRooms:Object.keys(dayData).sort();
+    if(!allRooms.length){document.getElementById('gridContainer').innerHTML='<p style="color:#94a3b8;font-size:.85rem;padding:8px 0">No classes on this day.</p>';return;}
 
     // Compute time range from occupied rooms only; fallback to 09:00–18:00
     let minT=540,maxT=1080;
