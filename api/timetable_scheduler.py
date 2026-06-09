@@ -188,31 +188,48 @@ _H9_ALLOWED_CROSS_CENTRE = {
 
 # Centre distance rank from SSP/CSW core (higher = closer)
 # Used for S4 CC Combine tie-breaking and travel risk assessment
+# WT=黃大仙, TS=青衣, TW=荃灣, ST=沙田, SW=上環, KT=觀塘, TKO=將軍澳, TM=屯門, FL=粉嶺
 _CENTRE_RANK = {
     "SSP": 9, "CSW": 9,
     "WT":  8,
     "TS":  7, "TW": 7,
-    "ST":  6,
-    "SW":  5,
-    "KT":  4,
-    "TKO": 3,
-    "TM":  2,
-    "FL":  1,
+    "ST":  6, "SW":  6,
+    "KT":  5,
+    "TKO": 4,
+    "TM":  2, "FL":  2,
 }
 
-# Estimated MTR travel time in minutes between centres (symmetric, ±5 min accuracy)
+# MTR/transport travel time in minutes between centres (symmetric, ±5 min)
+# Based on: SSP/CSW as core; WT=20, TS/TW=25, ST/SW=30, KT=35, TKO=45, TM/FL=60
+# TM↔FL via NT inland route (~60 min); SW cross-harbour distances corrected
 _TRAVEL_TIME: dict = {
-    "SSP": {"SSP":  0, "CSW":  8, "WT": 12, "KT": 25, "TKO": 35, "ST": 30, "FL": 55, "SW": 20, "TW": 15, "TS": 20, "TM": 50},
-    "CSW": {"SSP":  8, "CSW":  0, "WT": 10, "KT": 22, "TKO": 30, "ST": 28, "FL": 50, "SW": 18, "TW": 15, "TS": 22, "TM": 48},
-    "WT":  {"SSP": 12, "CSW": 10, "WT":  0, "KT": 20, "TKO": 25, "ST": 25, "FL": 45, "SW": 15, "TW": 20, "TS": 25, "TM": 45},
-    "KT":  {"SSP": 25, "CSW": 22, "WT": 20, "KT":  0, "TKO": 12, "ST": 35, "FL": 40, "SW": 30, "TW": 35, "TS": 35, "TM": 55},
-    "TKO": {"SSP": 35, "CSW": 30, "WT": 25, "KT": 12, "TKO":  0, "ST": 45, "FL": 50, "SW": 40, "TW": 45, "TS": 40, "TM": 65},
-    "ST":  {"SSP": 30, "CSW": 28, "WT": 25, "KT": 35, "TKO": 45, "ST":  0, "FL": 35, "SW": 20, "TW": 30, "TS": 30, "TM": 45},
-    "FL":  {"SSP": 55, "CSW": 50, "WT": 45, "KT": 40, "TKO": 50, "ST": 35, "FL":  0, "SW": 30, "TW": 45, "TS": 45, "TM": 80},
-    "SW":  {"SSP": 20, "CSW": 18, "WT": 15, "KT": 30, "TKO": 40, "ST": 20, "FL": 30, "SW":  0, "TW": 25, "TS": 25, "TM": 50},
-    "TW":  {"SSP": 15, "CSW": 15, "WT": 20, "KT": 35, "TKO": 45, "ST": 30, "FL": 45, "SW": 25, "TW":  0, "TS": 10, "TM": 35},
-    "TS":  {"SSP": 20, "CSW": 22, "WT": 25, "KT": 35, "TKO": 40, "ST": 30, "FL": 45, "SW": 25, "TW": 10, "TS":  0, "TM": 30},
-    "TM":  {"SSP": 50, "CSW": 48, "WT": 45, "KT": 55, "TKO": 65, "ST": 45, "FL": 80, "SW": 50, "TW": 35, "TS": 30, "TM":  0},
+    "SSP": {"SSP":  0, "CSW":  8, "WT": 20, "KT": 35, "TKO": 45, "ST": 30, "FL": 60, "SW": 30, "TW": 25, "TS": 25, "TM": 60},
+    "CSW": {"SSP":  8, "CSW":  0, "WT": 20, "KT": 35, "TKO": 43, "ST": 30, "FL": 60, "SW": 30, "TW": 25, "TS": 25, "TM": 58},
+    "WT":  {"SSP": 20, "CSW": 20, "WT":  0, "KT": 15, "TKO": 25, "ST": 25, "FL": 48, "SW": 32, "TW": 38, "TS": 38, "TM": 62},
+    "KT":  {"SSP": 35, "CSW": 35, "WT": 15, "KT":  0, "TKO": 15, "ST": 30, "FL": 52, "SW": 38, "TW": 42, "TS": 42, "TM": 68},
+    "TKO": {"SSP": 45, "CSW": 43, "WT": 25, "KT": 15, "TKO":  0, "ST": 40, "FL": 55, "SW": 42, "TW": 52, "TS": 50, "TM": 72},
+    "ST":  {"SSP": 30, "CSW": 30, "WT": 25, "KT": 30, "TKO": 40, "ST":  0, "FL": 15, "SW": 42, "TW": 40, "TS": 40, "TM": 58},
+    "FL":  {"SSP": 60, "CSW": 60, "WT": 48, "KT": 52, "TKO": 55, "ST": 15, "FL":  0, "SW": 65, "TW": 55, "TS": 58, "TM": 60},
+    "SW":  {"SSP": 30, "CSW": 30, "WT": 32, "KT": 38, "TKO": 42, "ST": 42, "FL": 65, "SW":  0, "TW": 25, "TS": 28, "TM": 65},
+    "TW":  {"SSP": 25, "CSW": 25, "WT": 38, "KT": 42, "TKO": 52, "ST": 40, "FL": 55, "SW": 25, "TW":  0, "TS": 10, "TM": 32},
+    "TS":  {"SSP": 25, "CSW": 25, "WT": 38, "KT": 42, "TKO": 50, "ST": 40, "FL": 58, "SW": 28, "TW": 10, "TS":  0, "TM": 30},
+    "TM":  {"SSP": 60, "CSW": 58, "WT": 62, "KT": 68, "TKO": 72, "ST": 58, "FL": 60, "SW": 65, "TW": 32, "TS": 30, "TM":  0},
+}
+
+# Nearest centres per centre, sorted by travel time (used for J8 room overflow fallback)
+# Only includes centres within practical travel range (≤65 min)
+_NEAREST_CENTRES: dict = {
+    "SSP": ["CSW", "WT", "TW", "TS", "ST", "SW"],        # core pair; WT 20min
+    "CSW": ["SSP", "WT", "TW", "TS", "ST", "SW"],        # core pair; WT 20min
+    "WT":  ["KT", "SSP", "CSW", "TKO", "ST"],            # KT/SSP 15-20min
+    "KT":  ["TKO", "WT", "ST", "SSP", "CSW"],            # TKO/WT 15min
+    "TKO": ["KT", "WT", "ST", "SSP", "CSW"],             # KT 15min; isolated east
+    "ST":  ["FL", "WT", "KT", "TKO", "SSP", "CSW"],      # FL 15min (East Rail)
+    "FL":  ["ST", "WT", "KT", "TKO", "TM"],              # ST 15min; TM via NT 60min
+    "SW":  ["TW", "TS", "SSP", "CSW", "WT"],             # TW/TS 25-28min; cross-harbour
+    "TW":  ["TS", "SSP", "CSW", "SW", "TM"],             # TS 10min; TM via West Rail 32min
+    "TS":  ["TW", "TM", "SSP", "CSW", "SW"],             # TW 10min; TM 30min (West Rail)
+    "TM":  ["TS", "TW", "FL", "SSP", "CSW"],             # TS 30min; FL via NT 60min
 }
 
 
@@ -597,20 +614,15 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
         if row:
             return row[0], allowed_centre
 
-    # J8 assumption: try nearest centres within H8 travel limit
+    # J8 assumption: try nearest centres in defined proximity order
     allowed = _allowed_centres_for_group(group_code)
-    nearby = sorted(
-        [(c, _travel_mins(centre, c)) for c in _TRAVEL_TIME.get(centre, {})
-         if c not in allowed and _travel_mins(centre, c) <= _H8_MAX_TRAVEL_MIN],
-        key=lambda x: x[1]
-    )
-    for fb_centre, _ in nearby:
+    for fb_centre in _NEAREST_CENTRES.get(centre, []):
         row = conn.execute("""
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
             ORDER BY capacity DESC LIMIT 1
         """, (fb_centre, student_count)).fetchone()
-        if row:
+        if fb_centre not in allowed and row:
             return row[0], fb_centre
 
     return None, None  # no room anywhere within travel limit
