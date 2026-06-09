@@ -185,6 +185,15 @@
     .tb-time { font-size: 1rem; font-weight: 800; color: #1e40af; }
     .tb-card.tko .tb-time { color: #92400e; }
     .tb-note { font-size: .75rem; color: #94a3b8; margin-top: 4px; }
+    /* ── Term setup card ── */
+    .term-setup { padding: 18px 24px; }
+    .term-setup h3 { font-size: .85rem; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+    .term-row { display: flex; gap: 20px; flex-wrap: wrap; }
+    .term-field { flex: 1; min-width: 200px; }
+    .term-field label { display: block; font-size: .78rem; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+    .term-field input[type=date] { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: .87rem; font-family: inherit; color: var(--text); background: #fff; outline: none; transition: border-color .15s; }
+    .term-field input[type=date]:focus { border-color: var(--accent); }
+    .term-save-note { font-size: .72rem; color: var(--dim); margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -241,6 +250,22 @@
     <button class="btn" id="generateBtn" disabled>
       ⚙ 全自動排班 &nbsp; Auto-Generate Timetable (V4)
     </button>
+  </div>
+
+  <!-- Term Setup -->
+  <div class="card term-setup">
+    <h3>📅 學期設定 Term Dates</h3>
+    <div class="term-row">
+      <div class="term-field">
+        <label for="termT2025C">T2025C 學期開始日 (第一週星期一)</label>
+        <input type="date" id="termT2025C" placeholder="YYYY-MM-DD">
+      </div>
+      <div class="term-field">
+        <label for="termT2026A">T2026A 學期開始日 (第一週星期一)</label>
+        <input type="date" id="termT2026A" placeholder="YYYY-MM-DD">
+      </div>
+    </div>
+    <p class="term-save-note">設定會自動儲存。排班時會在 Excel 中加入學期日期表（公眾假期以紅色標示）。</p>
   </div>
 
   <!-- Loading -->
@@ -555,12 +580,32 @@
     if (id === 'results') el.classList.toggle('visible', visible);
   }
 
+  // ── Term dates: localStorage persistence ──────────────────────────────────
+  const termT2025CInput = document.getElementById('termT2025C');
+  const termT2026AInput = document.getElementById('termT2026A');
+
+  function loadTermDates() {
+    const t2025c = localStorage.getItem('hkit_term_t2025c');
+    const t2026a = localStorage.getItem('hkit_term_t2026a');
+    if (t2025c) termT2025CInput.value = t2025c;
+    if (t2026a) termT2026AInput.value = t2026a;
+  }
+  function saveTermDates() {
+    localStorage.setItem('hkit_term_t2025c', termT2025CInput.value || '');
+    localStorage.setItem('hkit_term_t2026a', termT2026AInput.value || '');
+  }
+  termT2025CInput.addEventListener('change', saveTermDates);
+  termT2026AInput.addEventListener('change', saveTermDates);
+  loadTermDates();
+
   async function generate() {
     if (!selectedFile) return;
     generateBtn.disabled = true;
     show('loading', true); show('errorBox', false); show('results', false);
     document.getElementById('errorBox').textContent = '';
     const fd = new FormData(); fd.append('file', selectedFile);
+    if (termT2025CInput.value) fd.append('term_t2025c', termT2025CInput.value);
+    if (termT2026AInput.value) fd.append('term_t2026a', termT2026AInput.value);
     try {
       const res  = await fetch('/api/schedule/v4', { method: 'POST', body: fd });
       const data = await res.json();

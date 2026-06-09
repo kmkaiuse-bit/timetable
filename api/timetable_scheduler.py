@@ -1723,10 +1723,56 @@ _TIME_SLOTS = ["0900 - 1100", "1000 - 1200", "1100 - 1300", "1200 - 1400",
 _DAYS_ORDER  = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 _DAY_ABBR    = {"Monday": "Mon", "Tuesday": "Tue", "Wednesday": "Wed",
                 "Thursday": "Thu", "Friday": "Fri"}
+_DAY_OFFSET  = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4}
+
+# HK Public Holidays 2025–2026 (ISO format YYYY-MM-DD)
+_HK_HOLIDAYS = {
+    # 2025
+    "2025-01-01",                                # New Year's Day
+    "2025-01-29", "2025-01-30", "2025-01-31",   # Lunar New Year (Snake)
+    "2025-04-04",                                # Ching Ming Festival
+    "2025-04-18", "2025-04-19", "2025-04-21",   # Good Friday / Easter
+    "2025-05-01",                                # Labour Day
+    "2025-05-05",                                # Buddha's Birthday
+    "2025-06-02",                                # Tuen Ng Festival
+    "2025-07-01",                                # HKSAR Establishment Day
+    "2025-10-01",                                # National Day
+    "2025-10-07",                                # Day after Mid-Autumn Festival
+    "2025-10-29",                                # Chung Yeung Festival
+    "2025-12-25", "2025-12-26",                 # Christmas
+    # 2026
+    "2026-01-01",                                # New Year's Day
+    "2026-02-17", "2026-02-18", "2026-02-19",   # Lunar New Year (Horse)
+    "2026-04-03", "2026-04-04", "2026-04-06",   # Good Friday / Easter
+    "2026-04-05",                                # Ching Ming Festival (substitute Apr 6 if clash)
+    "2026-05-01",                                # Labour Day
+    "2026-05-25",                                # Buddha's Birthday
+    "2026-06-19",                                # Tuen Ng Festival
+    "2026-07-01",                                # HKSAR Establishment Day
+    "2026-09-25",                                # Day after Mid-Autumn Festival
+    "2026-10-01",                                # National Day
+    "2026-10-20",                                # Chung Yeung Festival
+    "2026-12-25", "2026-12-26",                 # Christmas
+}
+
+
+def generate_class_dates(start_date_str: str, day_name: str, n_weeks: int = 15):
+    """Return n_weeks dates for a class on day_name, starting from the week of start_date.
+    start_date_str: 'YYYY-MM-DD' (should be the Monday of week 1).
+    Returns list of datetime.date objects."""
+    from datetime import date, timedelta
+    try:
+        term_start = date.fromisoformat(start_date_str)
+    except (ValueError, AttributeError):
+        return []
+    monday = term_start - timedelta(days=term_start.weekday())
+    offset = _DAY_OFFSET.get(day_name, 0)
+    return [monday + timedelta(weeks=w, days=offset) for w in range(n_weeks)]
 
 
 def write_output_fast(results: list, english_weekly: dict = None,
-                      issues: list = None, assumptions: list = None) -> bytes:
+                      issues: list = None, assumptions: list = None,
+                      term_dates: dict = None) -> bytes:
     """Build a new clean workbook from results — no original formatting loaded.
     Runs in < 1 s vs 47 s for the modify-in-place approach."""
     from io import BytesIO
@@ -1836,6 +1882,40 @@ def write_output_fast(results: list, english_weekly: dict = None,
                     len(affected),
                     ", ".join(affected[:20]),
                 ])
+
+    # ── Term Date Sheets ──────────────────────────────────────────────────────
+    if term_dates:
+        from openpyxl.styles import PatternFill, Font as _Font
+        from datetime import date as _date
+        red_fill = PatternFill("solid", fgColor="FF4444")
+        hdr_font = _Font(bold=True)
+
+        # Build lookup: class_code → day
+        day_lookup = {r["class_code"]: r["day"] for r in results if r["class_code"] and r["day"]}
+
+        for term_code, start_date_str in sorted(term_dates.items()):
+            if not start_date_str:
+                continue
+            ws_dt = wb.create_sheet(f"{term_code} Dates")
+            hdr = ["Class Code", "Day"] + [f"Wk {i+1}" for i in range(15)]
+            ws_dt.append(hdr)
+            for cell in ws_dt[1]:
+                cell.font = hdr_font
+
+            seen = set()
+            for r in sorted(results, key=lambda x: (x["day"] or "", x["class_code"] or "")):
+                cc = r["class_code"]
+                day_name = r["day"]
+                if not cc or not day_name or cc in seen:
+                    continue
+                seen.add(cc)
+                dates = generate_class_dates(start_date_str, day_name)
+                row_data = [cc, day_name] + [d.strftime("%d/%m/%Y") for d in dates]
+                ws_dt.append(row_data)
+                row_idx = ws_dt.max_row
+                for col_idx, d in enumerate(dates, start=3):
+                    if d.strftime("%Y-%m-%d") in _HK_HOLIDAYS:
+                        ws_dt.cell(row=row_idx, column=col_idx).fill = red_fill
 
     buf = BytesIO()
     wb.save(buf)
@@ -2078,10 +2158,11 @@ def phase0_schedule_cadets(conn: sqlite3.Connection) -> tuple:
     return scheduled, errors
 
 
-def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
+def run_v4_from_bytes(excel_bytes: bytes, term_dates: dict = None) -> tuple:
     """
     v4 entry point: auto-assigns Day/Time/Room when Class list answer is empty.
     Falls back to v3 behaviour if Class list answer is already filled.
+    term_dates: optional dict {"T2025C": "YYYY-MM-DD", "T2026A": "YYYY-MM-DD"}
     """
     import gc
     from io import BytesIO
@@ -2233,6 +2314,7 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
         english_weekly=english_weekly,
         issues=stats.get("issues"),
         assumptions=stats.get("assumptions"),
+        term_dates=term_dates,
     )
     return output_bytes, stats
 

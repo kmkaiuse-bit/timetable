@@ -100,7 +100,14 @@ def schedule_v4():
     if not (f.filename or "").lower().endswith(".xlsx"):
         return jsonify({"error": "Please upload an .xlsx file"}), 400
     try:
-        output_bytes, stats = run_v4_from_bytes(f.read())
+        term_dates = {}
+        t2025c = (request.form.get("term_t2025c") or "").strip()
+        t2026a = (request.form.get("term_t2026a") or "").strip()
+        if t2025c:
+            term_dates["T2025C"] = t2025c
+        if t2026a:
+            term_dates["T2026A"] = t2026a
+        output_bytes, stats = run_v4_from_bytes(f.read(), term_dates=term_dates or None)
         return jsonify({
             "stats": stats,
             "file":  base64.b64encode(output_bytes).decode("utf-8"),
