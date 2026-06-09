@@ -151,6 +151,164 @@ _ENG_TERMS               = ["T2025C", "T2026A"]
 _ENG_WEEK_BLOCKS         = ["wk1-5", "wk6-10", "wk11-15"]
 _ENG_NET_EXEMPT_GROUPS   = {"CS1", "CS2", "CS3", "CS7"}   # no Net hours requirement
 
+# Pre-assigned English (DAE102) teacher assignments for current planning period.
+# Source: English Teacher Arrangement.xlsx B3:K27
+# Format: {(class_code, term, block): teacher_name}
+# Loaded from "English Weekly" Excel sheet at runtime if present; this dict is the fallback.
+# Columns F-H = T2025C wk1-5/6-10/11-15; Columns I-K = T2026A wk1-5/6-10/11-15
+_ENG_WEEKLY_PREASSIGNED: dict = {
+    ("DAE102_CS1",  "T2025C", "wk1-5"):   "Mr. Ivan Yuen",
+    ("DAE102_CS1",  "T2025C", "wk6-10"):  "Mr. Ivan Yuen",
+    ("DAE102_CS1",  "T2025C", "wk11-15"): "Mr. Ivan Yuen",
+    ("DAE102_CS1",  "T2026A", "wk1-5"):   "Mr. Ivan Yuen",
+    ("DAE102_CS1",  "T2026A", "wk6-10"):  "Mr. Peter Barrett",
+    ("DAE102_CS1",  "T2026A", "wk11-15"): "Mr. Ivan Yuen",
+    ("DAE102_CS2",  "T2025C", "wk1-5"):   "Mr. Ivan Yuen",
+    ("DAE102_CS2",  "T2025C", "wk6-10"):  "Mr. Ivan Yuen",
+    ("DAE102_CS2",  "T2025C", "wk11-15"): "Mr. Ivan Yuen",
+    ("DAE102_CS2",  "T2026A", "wk1-5"):   "Mr. Ivan Yuen",
+    ("DAE102_CS2",  "T2026A", "wk6-10"):  "Mr. Peter Barrett",
+    ("DAE102_CS2",  "T2026A", "wk11-15"): "Mr. Ivan Yuen",
+    ("DAE102_CS3",  "T2025C", "wk1-5"):   "Mr. Ivan Yuen",
+    ("DAE102_CS3",  "T2025C", "wk6-10"):  "Mr. Ivan Yuen",
+    ("DAE102_CS3",  "T2025C", "wk11-15"): "Mr. Ivan Yuen",
+    ("DAE102_CS3",  "T2026A", "wk1-5"):   "Mr. Ivan Yuen",
+    ("DAE102_CS3",  "T2026A", "wk6-10"):  "Mr. Peter Barrett",
+    ("DAE102_CS3",  "T2026A", "wk11-15"): "Mr. Ivan Yuen",
+    ("DAE102_CS4",  "T2025C", "wk1-5"):   "Ms. Elise Ye",
+    ("DAE102_CS4",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_CS4",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_CS4",  "T2026A", "wk1-5"):   "Ms. Elise Ye",
+    ("DAE102_CS4",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_CS4",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_CS5",  "T2025C", "wk1-5"):   "Ms. Elise Ye",
+    ("DAE102_CS5",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_CS5",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_CS5",  "T2026A", "wk1-5"):   "Ms. Elise Ye",
+    ("DAE102_CS5",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_CS5",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_CS6",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_CS6",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_CS6",  "T2025C", "wk11-15"): "Mr. Ray Leung",
+    ("DAE102_CS6",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_CS6",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_CS6",  "T2026A", "wk11-15"): "Mr. Ray Leung",
+    ("DAE102_CS7",  "T2025C", "wk1-5"):   "Mr. Ivan Yuen",
+    ("DAE102_CS7",  "T2025C", "wk6-10"):  "Mr. Ivan Yuen",
+    ("DAE102_CS7",  "T2025C", "wk11-15"): "Mr. Ivan Yuen",
+    ("DAE102_CS7",  "T2026A", "wk1-5"):   "Mr. Ivan Yuen",
+    ("DAE102_CS7",  "T2026A", "wk6-10"):  "Mr. Peter Barrett",
+    ("DAE102_CS7",  "T2026A", "wk11-15"): "Mr. Ivan Yuen",
+    ("DAE102_WT1",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_WT1",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_WT1",  "T2025C", "wk11-15"): "Mr. Chris Hon",
+    ("DAE102_WT1",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_WT1",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_WT1",  "T2026A", "wk11-15"): "Mr. Chris Hon",
+    ("DAE102_WT2",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_WT2",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_WT2",  "T2025C", "wk11-15"): "Mr. Chris Hon",
+    ("DAE102_WT2",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_WT2",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_WT2",  "T2026A", "wk11-15"): "Mr. Chris Hon",
+    ("DAE102_SW1",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_SW1",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_SW1",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_SW1",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_SW1",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_SW1",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_TW1",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_TW1",  "T2025C", "wk6-10"):  "Ms. Elise Ye",
+    ("DAE102_TW1",  "T2025C", "wk11-15"): "Ms. Sasha Cheung",
+    ("DAE102_TW1",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_TW1",  "T2026A", "wk6-10"):  "Ms. Elise Ye",
+    ("DAE102_TW1",  "T2026A", "wk11-15"): "Ms. Sasha Cheung",
+    ("DAE102_TW2",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_TW2",  "T2025C", "wk6-10"):  "Ms. Elise Ye",
+    ("DAE102_TW2",  "T2025C", "wk11-15"): "Ms. Sasha Cheung",
+    ("DAE102_TW2",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_TW2",  "T2026A", "wk6-10"):  "Ms. Elise Ye",
+    ("DAE102_TW2",  "T2026A", "wk11-15"): "Ms. Sasha Cheung",
+    ("DAE102_TW3",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_TW3",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_TW3",  "T2025C", "wk11-15"): "Mr. Ray Leung",
+    ("DAE102_TW3",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_TW3",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_TW3",  "T2026A", "wk11-15"): "Mr. Ray Leung",
+    ("DAE102_TM1",  "T2025C", "wk1-5"):   "Ms. Sasha Cheung",
+    ("DAE102_TM1",  "T2025C", "wk6-10"):  "Ms. Sasha Cheung",
+    ("DAE102_TM1",  "T2025C", "wk11-15"): "Mr. Peter Barrett",
+    ("DAE102_TM1",  "T2026A", "wk1-5"):   "Ms. Sasha Cheung",
+    ("DAE102_TM1",  "T2026A", "wk6-10"):  "Ms. Sasha Cheung",
+    ("DAE102_TM1",  "T2026A", "wk11-15"): "Mr. Peter Barrett",
+    ("DAE102_TM2",  "T2025C", "wk1-5"):   "Ms. Sasha Cheung",
+    ("DAE102_TM2",  "T2025C", "wk6-10"):  "Ms. Sasha Cheung",
+    ("DAE102_TM2",  "T2025C", "wk11-15"): "Mr. Peter Barrett",
+    ("DAE102_TM2",  "T2026A", "wk1-5"):   "Ms. Sasha Cheung",
+    ("DAE102_TM2",  "T2026A", "wk6-10"):  "Ms. Sasha Cheung",
+    ("DAE102_TM2",  "T2026A", "wk11-15"): "Mr. Peter Barrett",
+    ("DAE102_TM3",  "T2025C", "wk1-5"):   "Ms. Sasha Cheung",
+    ("DAE102_TM3",  "T2025C", "wk6-10"):  "Ms. Sasha Cheung",
+    ("DAE102_TM3",  "T2025C", "wk11-15"): "Mr. Peter Barrett",
+    ("DAE102_TM3",  "T2026A", "wk1-5"):   "Ms. Sasha Cheung",
+    ("DAE102_TM3",  "T2026A", "wk6-10"):  "Ms. Sasha Cheung",
+    ("DAE102_TM3",  "T2026A", "wk11-15"): "Mr. Peter Barrett",
+    ("DAE102_TM4",  "T2025C", "wk1-5"):   "Ms. Sasha Cheung",
+    ("DAE102_TM4",  "T2025C", "wk6-10"):  "Ms. Sasha Cheung",
+    ("DAE102_TM4",  "T2025C", "wk11-15"): "Mr. Peter Barrett",
+    ("DAE102_TM4",  "T2026A", "wk1-5"):   "Ms. Sasha Cheung",
+    ("DAE102_TM4",  "T2026A", "wk6-10"):  "Ms. Sasha Cheung",
+    ("DAE102_TM4",  "T2026A", "wk11-15"): "Mr. Peter Barrett",
+    ("DAE102_KT1",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_KT1",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_KT1",  "T2025C", "wk11-15"): "Mr. Chris Hon",
+    ("DAE102_KT1",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_KT1",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_KT1",  "T2026A", "wk11-15"): "Mr. Chris Hon",
+    ("DAE102_KT2",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_KT2",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_KT2",  "T2025C", "wk11-15"): "Mr. Chris Hon",
+    ("DAE102_KT2",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_KT2",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
+    ("DAE102_KT2",  "T2026A", "wk11-15"): "Mr. Chris Hon",
+    ("DAE102_KT3",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_KT3",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_KT3",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_KT3",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_KT3",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_KT3",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_TK1",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_TK1",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_TK1",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_TK1",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
+    ("DAE102_TK1",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
+    ("DAE102_TK1",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
+    ("DAE102_ST1",  "T2025C", "wk1-5"):   "Ms. Lee Kit Wan",
+    ("DAE102_ST1",  "T2025C", "wk6-10"):  "Mr. Peter Barrett",
+    ("DAE102_ST1",  "T2025C", "wk11-15"): "Ms. Lee Kit Wan",
+    ("DAE102_ST1",  "T2026A", "wk1-5"):   "Mr. Peter Barrett",
+    ("DAE102_ST1",  "T2026A", "wk6-10"):  "Ms. Lee Kit Wan",
+    ("DAE102_ST1",  "T2026A", "wk11-15"): "Ms. Lee Kit Wan",
+    ("DAE102_ST2",  "T2025C", "wk1-5"):   "Mr. Peter Barrett",
+    ("DAE102_ST2",  "T2025C", "wk6-10"):  "Ms. Elise Ye",
+    ("DAE102_ST2",  "T2025C", "wk11-15"): "Ms. Elise Ye",
+    ("DAE102_ST2",  "T2026A", "wk1-5"):   "Mr. Peter Barrett",
+    ("DAE102_ST2",  "T2026A", "wk6-10"):  "Ms. Elise Ye",
+    ("DAE102_ST2",  "T2026A", "wk11-15"): "Ms. Elise Ye",
+    ("DAE102_ST3",  "T2025C", "wk1-5"):   "Mr. Peter Barrett",
+    ("DAE102_ST3",  "T2025C", "wk6-10"):  "Ms. Elise Ye",
+    ("DAE102_ST3",  "T2025C", "wk11-15"): "Ms. Elise Ye",
+    ("DAE102_ST3",  "T2026A", "wk1-5"):   "Mr. Peter Barrett",
+    ("DAE102_ST3",  "T2026A", "wk6-10"):  "Ms. Elise Ye",
+    ("DAE102_ST3",  "T2026A", "wk11-15"): "Ms. Elise Ye",
+    ("DAE102_FL1",  "T2025C", "wk1-5"):   "Ms. Lee Kit Wan",
+    ("DAE102_FL1",  "T2025C", "wk6-10"):  "Mr. Peter Barrett",
+    ("DAE102_FL1",  "T2025C", "wk11-15"): "Ms. Lee Kit Wan",
+    ("DAE102_FL1",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
+    ("DAE102_FL1",  "T2026A", "wk6-10"):  "Ms. Lee Kit Wan",
+    ("DAE102_FL1",  "T2026A", "wk11-15"): "Ms. Lee Kit Wan",
+}
+
 # H8: max travel time (minutes) allowed for teacher to work two centres same day
 # Cross-centre pairs within this threshold → soft warning; beyond → hard block
 _H8_MAX_TRAVEL_MIN = 90
@@ -1335,23 +1493,63 @@ def _find_teacher(conn, subject_code, day, start_times, exclude, use_quota,
 
 # ─── Phase 3b: English Net teacher weekly assignment ─────────────────────────
 
-def assign_english_weekly(conn: sqlite3.Connection) -> dict:
+def _load_english_weekly_from_wb(wb) -> dict:
     """
-    Assign teachers to each English (DAE102) class per term × week-block.
+    Read pre-assigned English teacher data from the "English Weekly" sheet.
+    Returns {(class_code, term, block): teacher_name} or empty dict if sheet absent.
 
-    For each class and each term in _ENG_TERMS:
-      - 3 week-blocks (_ENG_WEEK_BLOCKS)
-      - ≥ _ENG_NET_MIN_BLOCKS blocks must use a Net teacher
-        (unless group_code is in _ENG_NET_EXEMPT_GROUPS)
-      - No teacher double-booked at same (day, time, block)
-      - Travel between centres ≤ _ENG_MAX_TRAVEL_MIN on same day within same block
-
-    Returns dict: {(class_code, term, block): teacher_name or None}
-    If no "Net Teachers" sheet was loaded (all is_net=0), Net constraint is skipped.
+    Expected sheet layout:
+      Row 1: headers (Class Code, T2025C wk1-5, T2025C wk6-10, T2025C wk11-15,
+                       T2026A wk1-5, T2026A wk6-10, T2026A wk11-15)
+      Row 2+: data rows
     """
-    from collections import defaultdict
+    if "English Weekly" not in wb.sheetnames:
+        return {}
+    ws = wb["English Weekly"]
+    result = {}
+    term_block_cols = [
+        ("T2025C", "wk1-5"),   # col B (index 1)
+        ("T2025C", "wk6-10"),  # col C (index 2)
+        ("T2025C", "wk11-15"), # col D (index 3)
+        ("T2026A", "wk1-5"),   # col E (index 4)
+        ("T2026A", "wk6-10"),  # col F (index 5)
+        ("T2026A", "wk11-15"), # col G (index 6)
+    ]
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        class_code = row[0]
+        if not class_code:
+            continue
+        class_code = str(class_code).strip()
+        for i, (term, block) in enumerate(term_block_cols):
+            teacher = row[i + 1] if len(row) > i + 1 else None
+            if teacher:
+                result[(class_code, term, block)] = str(teacher).strip()
+    return result
 
-    # All scheduled English classes
+
+def assign_english_weekly(conn: sqlite3.Connection,
+                           preassigned: dict = None) -> tuple:
+    """
+    Use pre-assigned English (DAE102) teacher data and validate constraints.
+
+    Priority:
+      1. preassigned dict (from "English Weekly" Excel sheet)
+      2. _ENG_WEEKLY_PREASSIGNED constant (hard-coded for current term)
+      3. Auto-assign fallback (legacy algorithm)
+
+    Checks:
+      - Teacher availability (B44): warn if assigned teacher unavailable on class day
+      - Net teacher requirement (B46): warn if ≥2 Net blocks not met per term
+      - CS1-3, CS7 exempt from Net requirement (B47/B48)
+
+    Returns (assignments_dict, warnings_list).
+    assignments_dict: {(class_code, term, block): teacher_name or None}
+    """
+    # Resolve which assignment source to use
+    source = preassigned if preassigned else _ENG_WEEKLY_PREASSIGNED
+    use_preassigned = bool(source)
+
+    # All scheduled English classes (day/time for availability check)
     eng_classes = conn.execute("""
         SELECT s.class_code, s.day, s.time1, cg.centre, c.group_code
         FROM schedule s
@@ -1362,78 +1560,128 @@ def assign_english_weekly(conn: sqlite3.Connection) -> dict:
     """, (_ENG_SUBJECT_CODE,)).fetchall()
 
     if not eng_classes:
-        return {}
+        return {}, []
 
-    # Separate Net and local English teachers
+    # Build lookup: class_code → {day, time1, centre, group}
+    cls_info = {r["class_code"]: dict(r) for r in eng_classes}
+
+    # Net teacher info for validation
     all_eng = conn.execute("""
         SELECT t.id, t.name, t.is_net
         FROM teachers t
         JOIN teacher_subjects ts ON ts.teacher_id = t.id
         WHERE ts.subject_code = ?
-        ORDER BY t.is_net DESC, t.name
     """, (_ENG_SUBJECT_CODE,)).fetchall()
+    net_names  = {r["name"] for r in all_eng if r["is_net"]}
+    name_to_id = {r["name"]: r["id"] for r in all_eng}
 
-    net_teachers   = [r["id"] for r in all_eng if r["is_net"]]
-    local_teachers = [r["id"] for r in all_eng if not r["is_net"]]
-    id_to_name     = {r["id"]: r["name"] for r in all_eng}
+    warnings   = []
+    assignments = {}   # (class_code, term, block) → teacher_name
 
-    # No Net teachers loaded → skip Net requirement
-    net_available = bool(net_teachers)
+    if use_preassigned:
+        # ── Mode 1: use pre-assigned teachers ────────────────────────────────
+        # Collect all class×term pairs that appear in source
+        cls_terms = set((k[0], k[1]) for k in source)
 
-    assignments = {}   # (class_code, term, block) → teacher_id or None
-
-    for term in _ENG_TERMS:
-        # Track assignments within this term:
-        # block_day_used[(block, day)] → set of teacher_ids already used
-        block_day_used = defaultdict(set)
-        # block_centre[(block, teacher_id, day)] → centre (for travel check)
-        block_centre: dict = {}
-
-        for cls in eng_classes:
-            class_code = cls["class_code"]
-            day        = cls["day"]
-            time1      = cls["time1"]
-            centre     = cls["centre"]
-            group      = cls["group_code"]
-            exempt     = group in _ENG_NET_EXEMPT_GROUPS
-
-            need_net   = 0 if (exempt or not net_available) else _ENG_NET_MIN_BLOCKS
-            net_given  = 0
-            block_assignments: list = []
+        for class_code, term in sorted(cls_terms):
+            info  = cls_info.get(class_code)
+            if not info:
+                continue
+            day   = info["day"]
+            time1 = info["time1"]
+            start = time1.split(" - ")[0].strip() if time1 else ""
+            group = info.get("group_code", "")
+            exempt = group in _ENG_NET_EXEMPT_GROUPS
+            net_count = 0
 
             for block in _ENG_WEEK_BLOCKS:
-                slot_key = (block, day, time1)
-                used     = block_day_used[slot_key]
+                teacher_name = source.get((class_code, term, block))
+                assignments[(class_code, term, block)] = teacher_name
 
-                # Decide pool order: Net first if still need Net, else local
-                if net_given < need_net:
-                    pool = net_teachers + local_teachers
-                else:
-                    pool = local_teachers + net_teachers
+                if not teacher_name:
+                    continue
 
-                chosen = None
-                for tid in pool:
-                    if tid in used:
-                        continue
-                    # Travel check: English teacher ≤ 30 min same day same block
-                    committed_centre = block_centre.get((block, tid, day))
-                    if committed_centre and committed_centre != centre:
-                        if _travel_mins(committed_centre, centre) > _ENG_MAX_TRAVEL_MIN:
+                # Availability check (B44): warn if teacher marked unavailable
+                tid = name_to_id.get(teacher_name)
+                if tid and day and start:
+                    unavail = conn.execute("""
+                        SELECT 1 FROM teacher_unavailability
+                        WHERE teacher_id=? AND day=? AND start_time=?
+                    """, (tid, day, start)).fetchone()
+                    if unavail:
+                        warnings.append({
+                            "class":   class_code,
+                            "teacher": teacher_name,
+                            "day":     day,
+                            "reason":  f"English Weekly: {teacher_name} unavailable on {day} {time1} ({term} {block})",
+                        })
+
+                if teacher_name in net_names:
+                    net_count += 1
+
+            # Net requirement check (B46)
+            if not exempt and net_count < _ENG_NET_MIN_BLOCKS:
+                warnings.append({
+                    "class":   class_code,
+                    "teacher": "",
+                    "day":     term,
+                    "reason":  f"English Net shortfall: {net_count}/{_ENG_NET_MIN_BLOCKS} Net blocks in {term} (insufficient Net teacher supply)",
+                })
+
+    else:
+        # ── Mode 2: auto-assign fallback (legacy algorithm) ──────────────────
+        from collections import defaultdict
+        net_teachers   = [r["id"] for r in all_eng if r["is_net"]]
+        local_teachers = [r["id"] for r in all_eng if not r["is_net"]]
+        id_to_name_map = {r["id"]: r["name"] for r in all_eng}
+        net_available  = bool(net_teachers)
+
+        for term in _ENG_TERMS:
+            block_day_used = defaultdict(set)
+            block_centre: dict = {}
+
+            for cls in eng_classes:
+                class_code = cls["class_code"]
+                day        = cls["day"]
+                time1      = cls["time1"]
+                centre     = cls["centre"]
+                group      = cls["group_code"]
+                exempt     = group in _ENG_NET_EXEMPT_GROUPS
+                need_net   = 0 if (exempt or not net_available) else _ENG_NET_MIN_BLOCKS
+                net_given  = 0
+
+                for block in _ENG_WEEK_BLOCKS:
+                    used = block_day_used[(block, day, time1)]
+                    pool = (net_teachers + local_teachers) if net_given < need_net \
+                           else (local_teachers + net_teachers)
+                    chosen = None
+                    for tid in pool:
+                        if tid in used:
                             continue
-                    chosen = tid
-                    break
+                        committed_centre = block_centre.get((block, tid, day))
+                        if committed_centre and committed_centre != centre:
+                            if _travel_mins(committed_centre, centre) > _ENG_MAX_TRAVEL_MIN:
+                                continue
+                        chosen = tid
+                        break
+                    t_name = id_to_name_map.get(chosen) if chosen else None
+                    assignments[(class_code, term, block)] = t_name
+                    if chosen:
+                        used.add(chosen)
+                        block_centre[(block, chosen, day)] = centre
+                        if chosen in net_teachers:
+                            net_given += 1
 
-                assignments[(class_code, term, block)] = chosen
-                if chosen:
-                    used.add(chosen)
-                    block_centre[(block, chosen, day)] = centre
-                    if chosen in net_teachers:
-                        net_given += 1
+                # Net shortfall check
+                if not exempt and net_given < need_net:
+                    warnings.append({
+                        "class":   class_code,
+                        "teacher": "",
+                        "day":     term,
+                        "reason":  f"English Net shortfall: {net_given}/{_ENG_NET_MIN_BLOCKS} Net blocks in {term} (insufficient Net teacher supply)",
+                    })
 
-    # Convert teacher_id → name
-    return {
-        k: id_to_name.get(v) for k, v in assignments.items()
-    }
+    return assignments, warnings
 
 
 # ─── Phase 4: Collect results ─────────────────────────────────────────────────
@@ -1829,6 +2077,8 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
         BytesIO(excel_bytes), data_only=True, read_only=True)
 
     conn, n_sched, n_unavail = build_db(wb_read)
+    # Load English Weekly pre-assignments before closing workbook
+    eng_preassigned_from_wb = _load_english_weekly_from_wb(wb_read)
     wb_read.close()
     del wb_read
     gc.collect()
@@ -1852,7 +2102,9 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     # else: Class list answer already filled → use existing schedule as-is
 
     unassigned, s1_warnings, unassigned_detail = assign_teachers(conn)
-    english_weekly = assign_english_weekly(conn)    # Phase 3b
+    # Phase 3b: English weekly — use pre-assigned data from Excel or hard-coded constant
+    english_weekly, eng_warnings = assign_english_weekly(
+        conn, preassigned=eng_preassigned_from_wb or None)
     results        = collect_results(conn)
     stats          = collect_stats(conn, results, unassigned, s1_warnings)
     stats["unscheduled_rooms"]    = unscheduled_rooms
@@ -1866,6 +2118,11 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
             stats["warnings"].append({"class": e, "teacher": "", "day": "", "reason": "Cadet Phase0 ERROR"})
         for e in cc_errors:
             stats["warnings"].append({"class": e, "teacher": "", "day": "", "reason": "CC Combine ERROR"})
+
+    # Merge English weekly warnings (availability + Net shortfall)
+    if eng_warnings:
+        stats.setdefault("warnings", [])
+        stats["warnings"].extend(eng_warnings)
 
     # Collect Net teacher names before conn is released
     net_names = {r["name"] for r in conn.execute(
@@ -1951,24 +2208,7 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     del conn
     gc.collect()
 
-    # Report English Net teacher shortfalls as warnings (uses net_names, not conn)
-    if english_weekly and net_names:
-        eng_codes = {k[0] for k in english_weekly}
-        for code in sorted(eng_codes):
-            grp = code.split("_")[1] if "_" in code else ""
-            if grp in _ENG_NET_EXEMPT_GROUPS:
-                continue
-            for term in _ENG_TERMS:
-                net_cnt = sum(
-                    1 for blk in _ENG_WEEK_BLOCKS
-                    if english_weekly.get((code, term, blk)) in net_names)
-                if net_cnt < _ENG_NET_MIN_BLOCKS:
-                    stats["warnings"].append({
-                        "class":   code,
-                        "teacher": "",
-                        "day":     term,
-                        "reason":  f"English Net shortfall: {net_cnt}/{_ENG_NET_MIN_BLOCKS} Net blocks in {term} (insufficient Net teacher supply)",
-                    })
+    # Net shortfall warnings now generated inside assign_english_weekly() and merged above
 
     output_bytes = write_output_fast(
         results,
