@@ -127,6 +127,7 @@
     .tt-table tr:nth-child(even) td:first-child { background: #edf2f7; }
     .tt-table td:first-child { font-weight: 600; color: #374151; white-space: nowrap; font-size: .75rem; }
     .cell-code { font-weight: 700; font-size: .78rem; color: var(--text); }
+    .cell-time { font-size: .62rem; color: var(--dim); margin-top: 1px; letter-spacing: .01em; }
     .cell-subj { font-size: .71rem; color: #475569; margin-top: 2px; }
     .cell-lec  { font-size: .69rem; color: var(--muted); margin-top: 3px; }
     .cell-stu  { font-size: .64rem; color: var(--dim); margin-top: 1px; }
@@ -883,6 +884,7 @@
               data-code="${blk.entry.code}" data-day="${day}" data-room="${room}"
               data-start="${blk.start}" data-end="${blk.end}">
             <div class="cell-code">${blk.entry.code}</div>
+            <div class="cell-time">${minsToLabel(blk.start)}–${minsToLabel(blk.end)}</div>
             <div class="cell-subj">${blk.entry.subject_cn||''}</div>
             <div class="cell-lec" contenteditable="true" spellcheck="false" data-code="${blk.entry.code}">${blk.entry.lec1||''}</div>
             <div class="cell-stu">${blk.entry.students?blk.entry.students+' pax':''}</div>
