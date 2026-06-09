@@ -87,14 +87,14 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 
 | # | Category | Question | Impact |
 |---|----------|----------|--------|
-| J1 | H3 | TS→TM exception — this semester or next year? | Flip `_TS_TM_ENABLED = True` |
+| J1 | H3 | TS→TM exception — confirm assumption | **Assumed True** in V6.3 — reverse by setting `_TS_TM_ENABLED = False` |
 | J2 | CC | CC Combine max travel time threshold (minutes)? | Set `_CC_MAX_TRAVEL_MIN = X` |
 | J3 | S3 | Cadet class: exact room codes + Excel detection method? | Complete Phase 0 implementation |
 | J4 | Teacher | English/Local/Net teacher types — scheduling difference? | ✅ Answered 2026-06-02: Net = Barrett + Chris Hon; ≥20 hrs/term/class; 30min travel; CS1-3+CS7 exempt |
 | J5 | Cost | Include teacher price in scheduling? | New optimisation pass |
 | J6 | Teacher | Teacher assignment list — when available? | Teacher auto-assignment can't run without this |
 | J7 | CC | CC grouping full list — when available? | CC Combine can't run without this |
-| J8 | Rooms | FL/SW/TKO/ST/TM centres: classes with students > room capacity — split/relocate/accept? | Fix B6 room overflow; currently these classes unscheduled |
+| J8 | Rooms | FL/SW/TKO/ST/TM centres: classes with students > room capacity — split/relocate/accept? | **Assumed cross-centre fallback** in V6.3 (nearest centre ≤90 min); Issues panel shows all H3 exceptions |
 | J9 | English | 24 Net teacher shortfall warnings — acceptable? Or add Net teachers / change availability? | Reduce/eliminate `English Net shortfall` warnings |
 
 ---
@@ -124,17 +124,18 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 | 2026-05-23 | V6 | H4 soft cap, H6 TKO relax, H9 exceptions, S1b centre prefs, S2 students-only |
 | 2026-05-25 | V6.1 | `_TRAVEL_TIME` matrix, H8 soft gate, H3 toggle, S3 Phase 0, CC distance filter |
 | 2026-06-02 | V6.2 | Bug fixes B3/B4/B5, MRV ordering, English Net teacher weekly assignment |
+| 2026-06-09 | V6.3 | J1/J8 assumptions, reason codes, Issues panel + Excel sheet |
 
 ### Next (unblocked)
 
 | Priority | Item | Blocked by |
 |----------|------|-----------|
-| High | Get Jo's answers (J1–J8) | Jo |
+| High | Get Jo's answers (J2–J9) | Jo |
 | High | Fix Net teacher shortfall (24 warnings) | Jo — more Net teachers or revised rules |
-| Medium | Activate H3 TS→TM | J1 |
+| Medium | Confirm J1 assumption (TS→TM currently enabled) | Jo confirmation |
+| Medium | Confirm J8 assumption (cross-centre fallback currently enabled) | Jo confirmation |
 | Medium | Set CC distance threshold | J2 |
 | Medium | Complete S3 cadet class | J3 |
-| Medium | Fix room capacity overflow (B6) | J8 |
 | Low | Cost optimisation | J5 |
 
 ### Blocked (needs data)
