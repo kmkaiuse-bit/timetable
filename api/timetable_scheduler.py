@@ -464,8 +464,15 @@ def _load_subjects(conn: sqlite3.Connection, wb):
 def _load_rooms(conn: sqlite3.Connection, wb):
     ws = wb["Centre Room Allocation"]
     for row in ws.iter_rows(min_row=2, values_only=True):
-        code, cap = row[0], row[2]
-        if not code or not isinstance(cap, (int, float)) or cap <= 0:
+        code = row[0]
+        if not code:
+            continue
+        # Col D = "Max no of seats" (approved capacity); col C = "No of Seats" (physical seats).
+        # Use Max when available — e.g. FL Max=34 > No=29, SSP-303 Max=100 < No=111.
+        cap_no  = row[2] if len(row) > 2 else None
+        cap_max = row[3] if len(row) > 3 else None
+        cap = cap_max if isinstance(cap_max, (int, float)) and cap_max > 0 else cap_no
+        if not isinstance(cap, (int, float)) or cap <= 0:
             continue
         code_str = str(code).strip()
         centre   = code_str.split(" - ")[0].strip()

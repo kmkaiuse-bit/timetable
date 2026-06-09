@@ -745,19 +745,17 @@
         });
       }
 
-      html += '</tbody></table>';
-
-      // Assumptions — expanded with per-class from→to detail
+      // Assumptions — expanded with per-class from→to detail (inside table)
       const assumptions = stats.assumptions || [];
       if (assumptions.length > 0) {
-        html += `<tr class="i-group assume"><td colspan="4">🟡 假設已套用 — 待 Jo 確認 (${assumptions.reduce((n,a)=>n+(a.affected||[]).length,0)})</td></tr>`;
+        const totalAssume = assumptions.reduce((n,a)=>n+(a.affected||[]).length,0);
+        html += `<tr class="i-group assume"><td colspan="4">🟡 假設已套用 — 待 Jo 確認 (${totalAssume})</td></tr>`;
         assumptions.forEach(a => {
           const details = a.details || [];
           if (!details.length) {
             html += `<tr><td class="i-ctr">–</td><td class="i-code" colspan="2">${a.question}</td><td class="i-why">${a.assumption}</td></tr>`;
             return;
           }
-          // Group by from→to pair
           const pairMap = {};
           details.forEach(d => {
             const k = `${d.from}→${d.to}`;
@@ -766,14 +764,16 @@
           });
           Object.entries(pairMap).forEach(([pair, codes]) => {
             html += `<tr>
-              <td class="i-ctr" style="color:#92400e">⇄</td>
-              <td class="i-code" style="color:#92400e;font-size:.78rem">${pair}</td>
-              <td class="i-stu" style="color:#92400e">${codes.length}班</td>
-              <td class="i-why" style="font-size:.77rem;color:#78350f">${codes.slice(0,5).join(', ')}${codes.length>5?' …':''}
-              </td></tr>`;
+              <td class="i-ctr" style="color:#92400e;font-weight:700">⇄</td>
+              <td class="i-code" style="color:#92400e;font-weight:700;white-space:nowrap">${pair}</td>
+              <td class="i-stu" style="color:#92400e;font-weight:700">${codes.length}班</td>
+              <td class="i-why" style="font-size:.77rem;color:#78350f">${codes.slice(0,6).join('&thinsp;·&thinsp;')}${codes.length>6?' …':''}</td>
+            </tr>`;
           });
         });
       }
+
+      html += '</tbody></table>';
 
       document.getElementById('issuesInner').innerHTML = html;
     } else {
