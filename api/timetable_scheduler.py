@@ -433,9 +433,10 @@ def _extract_group(class_code: str) -> str:
 
 
 def _extract_centre(class_code: str) -> str:
-    """'DAE101_CS1' -> 'CS'"""
+    """'DAE101_CS1' -> 'CSW', 'DAE101_TK1' -> 'TKO' (applies GROUP_CENTRE_ALIAS)"""
     g = _extract_group(class_code)
-    return re.sub(r"\d+$", "", g)
+    prefix = re.sub(r"\d+$", "", g)
+    return _GROUP_CENTRE_ALIAS.get(prefix, prefix)
 
 
 # ─── Phase 1: Populate database from Excel ────────────────────────────────────
