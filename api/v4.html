@@ -135,6 +135,9 @@
     .slot-DAE103 { border-left: 5px solid #f59e0b; background: #fffcf0; }
     .slot-DAE106 { border-left: 5px solid #8b5cf6; background: #f8f5ff; }
     .slot-DAE108 { border-left: 5px solid #ef4444; background: #fff5f5; }
+    /* Cross-centre highlight */
+    td.cross-centre { border-left: 4px solid #f59e0b !important; background-color: rgba(251,191,36,.08) !important; }
+    .cell-cross { display: inline-block; font-size: .60rem; font-weight: 700; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 3px; padding: 0 4px; margin-top: 2px; white-space: nowrap; }
     td[draggable="true"] { cursor: grab; transition: box-shadow .12s, transform .12s; }
     td[draggable="true"]:hover { box-shadow: 0 3px 10px rgba(0,0,0,.13); transform: translateY(-1px); position: relative; z-index: 1; }
     td[draggable="true"]:active { cursor: grabbing; }
@@ -564,20 +567,33 @@
     generateBtn.disabled = false;
   }
 
-  const state = { results: [], editedCodes: new Set() };
+  const state = { results: [], editedCodes: new Set(), crossCentreMap: {} };
+
+  // Build cross-centre map: classCode → {from, to}  (used by grid + issues panel)
+  function buildCrossCentreMap(assumptions) {
+    const map = {};
+    (assumptions || []).forEach(a => {
+      (a.details || []).forEach(d => { map[d.code] = {from: d.from, to: d.to}; });
+    });
+    return map;
+  }
 
   function renderResults(stats) {
     state.results = stats.results || []; state.editedCodes = new Set(); updateEditBadge();
+    state.crossCentreMap = buildCrossCentreMap(stats.assumptions);
     const total = stats.total_classes, sched = stats.scheduled;
+    const trueTotal = stats.true_total || total;
+    const unscheduledCount = trueTotal - total;
     const viol = stats.violations.length, pct = stats.preferred_pct;
+    const allOk = sched === trueTotal;
     document.getElementById('statsGrid').innerHTML = `
-      <div class="stat ${sched===total?'good':'warn'}">
-        <div class="stat-num ${sched===total?'good':'warn'}">${sched}/${total}</div>
-        <div class="stat-label">已排班<br>Scheduled</div>
+      <div class="stat ${allOk?'good':'warn'}">
+        <div class="stat-num ${allOk?'good':'warn'}">${sched}/${trueTotal}</div>
+        <div class="stat-label">已排班 / 全部<br>Scheduled / Total</div>
       </div>
-      <div class="stat ${viol===0?'good':'warn'}">
-        <div class="stat-num ${viol===0?'good':'warn'}">${viol}</div>
-        <div class="stat-label">衝突<br>Violations</div>
+      <div class="stat ${unscheduledCount===0?'good':'warn'}">
+        <div class="stat-num ${unscheduledCount===0?'good':'warn'}">${unscheduledCount}</div>
+        <div class="stat-label">未能排班<br>Unscheduled</div>
       </div>
       <div class="stat ${pct>=80?'good':'warn'}">
         <div class="stat-num ${pct>=80?'good':'warn'}">${pct}%</div>
@@ -694,7 +710,8 @@
       const uniqueCodes = new Set(issues.map(i => i.code));
       issuesBadge.textContent = uniqueCodes.size;
 
-      const groups = { DATA_PROBLEM: [], ALGORITHM_ISSUE: [], ASSUMPTION: [] };
+      // ASSUMPTION items rendered separately below (with centre detail)
+      const groups = { DATA_PROBLEM: [], ALGORITHM_ISSUE: [] };
       issues.forEach(i => { if (groups[i.category]) groups[i.category].push(i); });
 
       let html = `<table class="issues-tbl">
@@ -721,14 +738,32 @@
 
       html += '</tbody></table>';
 
-      // Assumptions summary (compact)
+      // Assumptions — expanded with per-class from→to detail
       const assumptions = stats.assumptions || [];
       if (assumptions.length > 0) {
-        html += `<div class="issues-assume-row">📋 假設記錄：`;
-        html += assumptions.map(a =>
-          `<strong>${a.question}</strong> ${a.assumption}（${(a.affected||[]).length}班）`
-        ).join('　');
-        html += `</div>`;
+        html += `<tr class="i-group assume"><td colspan="4">🟡 假設已套用 — 待 Jo 確認 (${assumptions.reduce((n,a)=>n+(a.affected||[]).length,0)})</td></tr>`;
+        assumptions.forEach(a => {
+          const details = a.details || [];
+          if (!details.length) {
+            html += `<tr><td class="i-ctr">–</td><td class="i-code" colspan="2">${a.question}</td><td class="i-why">${a.assumption}</td></tr>`;
+            return;
+          }
+          // Group by from→to pair
+          const pairMap = {};
+          details.forEach(d => {
+            const k = `${d.from}→${d.to}`;
+            if (!pairMap[k]) pairMap[k] = [];
+            pairMap[k].push(d.code);
+          });
+          Object.entries(pairMap).forEach(([pair, codes]) => {
+            html += `<tr>
+              <td class="i-ctr" style="color:#92400e">⇄</td>
+              <td class="i-code" style="color:#92400e;font-size:.78rem">${pair}</td>
+              <td class="i-stu" style="color:#92400e">${codes.length}班</td>
+              <td class="i-why" style="font-size:.77rem;color:#78350f">${codes.slice(0,5).join(', ')}${codes.length>5?' …':''}
+              </td></tr>`;
+          });
+        });
       }
 
       document.getElementById('issuesInner').innerHTML = html;
@@ -832,13 +867,17 @@
           const span=(blk.end-blk.start)/GRID_STEP;
           const subj=(blk.entry.code||'').split('_')[0];
           const eCls=state.editedCodes.has(blk.entry.code)?' edited':'';
-          cells+=`<td colspan="${span}" class="slot-${subj}${eCls}" draggable="true"
+          const cc=state.crossCentreMap[blk.entry.code];
+          const ccCls=cc?' cross-centre':'';
+          const ccBadge=cc?`<div class="cell-cross">⇄ ${cc.from}→${cc.to}</div>`:'';
+          cells+=`<td colspan="${span}" class="slot-${subj}${eCls}${ccCls}" draggable="true"
               data-code="${blk.entry.code}" data-day="${day}" data-room="${room}"
               data-start="${blk.start}" data-end="${blk.end}">
             <div class="cell-code">${blk.entry.code}</div>
             <div class="cell-subj">${blk.entry.subject_cn||''}</div>
             <div class="cell-lec" contenteditable="true" spellcheck="false" data-code="${blk.entry.code}">${blk.entry.lec1||''}</div>
             <div class="cell-stu">${blk.entry.students?blk.entry.students+' pax':''}</div>
+            ${ccBadge}
           </td>`;
           t=blk.end;
         }else{

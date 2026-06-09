@@ -2184,26 +2184,31 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
             "suggested":   _SUGGESTED_ACTIONS.get(rc, "Confirm with Jo"),
         })
 
-    # Build assumptions list (for UI and Excel)
-    j1_affected = [e["code"] for e in core_h3 if e.get("reason_code") == "H3_TS_TM"]
-    j8_affected = [e["code"] for e in core_h3 if e.get("reason_code") == "H3_FALLBACK"]
+    # Build assumptions list with per-class centre detail (for UI, Excel, grid highlight)
+    j1_entries = [e for e in core_h3 if e.get("reason_code") == "H3_TS_TM"]
+    j8_entries = [e for e in core_h3 if e.get("reason_code") == "H3_FALLBACK"]
     assumptions_list = []
-    if j1_affected:
+    if j1_entries:
         assumptions_list.append({
             "question":   "J1",
             "assumption": "TS→TM cross-centre enabled",
-            "affected":   j1_affected,
+            "affected":   [e["code"] for e in j1_entries],
+            "details":    [{"code": e["code"], "from": e["from_centre"], "to": e["to_centre"]}
+                           for e in j1_entries],
         })
-    if j8_affected:
+    if j8_entries:
         assumptions_list.append({
             "question":   "J8",
             "assumption": "Cross-centre room fallback applied",
-            "affected":   j8_affected,
+            "affected":   [e["code"] for e in j8_entries],
+            "details":    [{"code": e["code"], "from": e["from_centre"], "to": e["to_centre"]}
+                           for e in j8_entries],
         })
 
     # Assign now — after enrichment built the final lists
     stats["issues"]      = all_issues
     stats["assumptions"] = assumptions_list
+    stats["true_total"]  = (stats.get("total_classes") or 0) + len(unscheduled_rooms)
 
     del conn
     gc.collect()
