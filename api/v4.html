@@ -322,9 +322,9 @@
     <div class="cause-row">
       <div class="cause-icon">🗺️</div>
       <div class="cause-body">
-        <strong>H8 · 老師當天已在另一個 Centre 教書</strong>
-        <span>例如：某老師早上在 CSW 教課，下午這班在 TW——系統不允許老師同一天去兩個 Centre。</span>
-        <em>解決方法：在下方時間表將這班拖移到另一天，令老師當天只需去一個 Centre。</em>
+        <strong>H8 · 老師當天跨 Centre 距離超限</strong>
+        <span>老師同日在兩個 Centre 教課，若交通超過 90 分鐘，系統 hard block 不允許分配。例如：早上 FL（粉嶺），下午 TM（屯門）= 80 分鐘，接近上限。≤ 90 分鐘則允許但發警告。</span>
+        <em>解決方法：將此班拖移到另一天，令老師當天只需去一個 Centre；或安排另一位老師。</em>
       </div>
     </div>
     <div class="cause-row">
@@ -381,12 +381,8 @@
       <tr>
         <td><strong>H3</strong></td>
         <td>學生上課地點須符合報名 Campus</td>
-        <td>報名 CSW 的學生，Core 科必須在 CSW 上課</td>
-      </tr>
-      <tr>
-        <td><strong>H4</strong></td>
-        <td>老師每週最多 6 班</td>
-        <td>1 loading = 1 班（無論 2小時或 4小時）</td>
+        <td>報名 CSW 的學生，Core 科必須在 CSW 上課。<br>
+            <span style="color:#92400e;font-size:.82rem">⇄ 若本 Centre 課室不足，系統會嘗試安排至鄰近 Centre（顯示橙色 ⇄ 標記），需 Jo 確認。</span></td>
       </tr>
       <tr>
         <td><strong>H5</strong></td>
@@ -396,7 +392,7 @@
       <tr>
         <td><strong>H6</strong></td>
         <td>TKO Centre 特別時段</td>
-        <td>只可排 10:00–14:00 或 15:00–19:00（冷氣費問題）</td>
+        <td>不可排 09:00 開始的班（冷氣費問題）。可用時段：10:00–14:00、14:00–18:00、15:00–19:00</td>
       </tr>
       <tr>
         <td><strong>H7</strong></td>
@@ -404,20 +400,28 @@
         <td>Teacher Load Table 有登記才能被分配</td>
       </tr>
       <tr>
-        <td><strong>H8</strong></td>
-        <td>老師同一天不能去兩個 Centre</td>
-        <td>例如早上 CSW、下午 TW = 不允許</td>
-      </tr>
-      <tr>
         <td><strong>H9</strong></td>
         <td>學生同一天不能去兩個 Centre</td>
-        <td>同一學生同日所有課須在同一 Centre</td>
+        <td>同一學生同日所有課須在同一 Centre。<br>
+            <span style="font-size:.82rem;color:#475569">例外（允許跨 Centre）：CSW ↔ SSP、TW ↔ CSW、TW ↔ SSP</span></td>
       </tr>
     </table>
 
     <h3 style="margin-top:20px">🟡 Soft Rules — 盡量符合，違反時系統發出警告</h3>
     <table class="rule-table">
       <tr><th>編號</th><th>規則</th><th>說明</th></tr>
+      <tr>
+        <td><strong>H4</strong></td>
+        <td>老師每週最多 6 班 <span class="badge-soft">軟上限</span></td>
+        <td>超出 6 班只發警告，不會 block 排班（可放寬）。1 loading = 1 班，無論 2 或 4 小時。</td>
+      </tr>
+      <tr>
+        <td><strong>H8</strong></td>
+        <td>老師同一天跨 Centre 限制 <span class="badge-soft">距離警告</span></td>
+        <td>老師同日在兩個 Centre 上課：<br>
+            • 交通 ≤ 90 分鐘 → 允許但發警告<br>
+            • 交通 &gt; 90 分鐘 → Hard block，不允許</td>
+      </tr>
       <tr>
         <td><strong>S1</strong></td>
         <td>老師不可用時間偏好</td>
@@ -432,6 +436,11 @@
         <td><strong>S3</strong></td>
         <td>班別平均分佈到每天</td>
         <td>同科目的班別輪流從 Mon→Tue→Thu→Wed→Fri 開始排，避免某天過份集中</td>
+      </tr>
+      <tr>
+        <td><strong>S4</strong></td>
+        <td>CC Combine 選人數最多的 Centre</td>
+        <td>多個 Centre 的班合併上課時，優先選用學生人數最多的 Centre 的課室</td>
       </tr>
     </table>
   </div>
@@ -451,11 +460,12 @@
       </div>
       <div class="tb-card tko">
         <div class="tb-label">TKO 將軍澳 ⚠</div>
-        <div class="tb-time">10:00–14:00 &nbsp;/&nbsp; 15:00–19:00</div>
+        <div class="tb-time">10:00 起（3 組時段）</div>
         <div class="tb-note">冷氣費問題，不可排 09:00 開始的班</div>
         <div class="tb-note" style="margin-top:8px;font-size:.76rem;color:#334155">
-          節 1：10:00–12:00 &nbsp;+&nbsp; 節 2：12:00–14:00<br>
-          節 3：15:00–17:00 &nbsp;+&nbsp; 節 4：17:00–19:00
+          組 A：10:00–12:00 + 12:00–14:00<br>
+          組 B：14:00–16:00 + 16:00–18:00<br>
+          組 C：15:00–17:00 + 17:00–19:00
         </div>
       </div>
     </div>
@@ -464,16 +474,15 @@
   <!-- ── Centre distances ── -->
   <div class="cp-section">
     <h2>🗺️ Centre 距離（以 SSP/CSW 為核心）</h2>
-    <p style="margin-bottom:12px;font-size:.84rem;color:#64748b">H8 規則：老師同一天不能去兩個 Centre。距離越遠，影響越大。</p>
+    <p style="margin-bottom:12px;font-size:.84rem;color:#64748b">H8 規則：老師同日跨 Centre ≤ 90 分鐘 → 允許並警告；&gt; 90 分鐘 → Hard block。距離越遠，影響越大。</p>
     <table class="rule-table">
       <tr><th>距離</th><th>Centre</th><th>地區</th><th>估算交通時間</th></tr>
       <tr><td><span class="badge-ok">最近</span></td><td><strong>SSP / CSW</strong></td><td>深水埗 / 長沙灣</td><td>核心</td></tr>
       <tr><td></td><td><strong>WT</strong></td><td>黃大仙</td><td>~20 分鐘</td></tr>
-      <tr><td></td><td><strong>TS / TW</strong></td><td>青衣 / 荃灣</td><td>~25 分鐘</td></tr>
+      <tr><td></td><td><strong>TS / TW</strong></td><td>天水圍 / 荃灣</td><td>~25 分鐘</td></tr>
       <tr><td></td><td><strong>ST</strong></td><td>沙田</td><td>~30 分鐘</td></tr>
       <tr><td></td><td><strong>SW</strong></td><td>上環</td><td>~30 分鐘（需過海）</td></tr>
-      <tr><td></td><td><strong>KT</strong></td><td>觀塘</td><td>~35 分鐘</td></tr>
-      <tr><td></td><td><strong>TKO</strong></td><td>將軍澳</td><td>~45 分鐘</td></tr>
+      <tr><td></td><td><strong>KT / TKO</strong></td><td>觀塘 / 將軍澳</td><td>~35–45 分鐘</td></tr>
       <tr><td></td><td><strong>TM</strong></td><td>屯門</td><td>~60 分鐘</td></tr>
       <tr><td><span class="badge-hard">最遠</span></td><td><strong>FL</strong></td><td>粉嶺</td><td>~60 分鐘</td></tr>
     </table>
