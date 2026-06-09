@@ -155,8 +155,25 @@ _ENG_NET_EXEMPT_GROUPS   = {"CS1", "CS2", "CS3", "CS7"}   # no Net hours require
 # Cross-centre pairs within this threshold → soft warning; beyond → hard block
 _H8_MAX_TRAVEL_MIN = 90
 
-# H3 TS→TM exception: set True when Jo confirms the rule is active (pending J1)
-_TS_TM_ENABLED = False
+# H3 TS→TM exception: J1 assumption enabled (confirm with Jo — reverse by setting False)
+_TS_TM_ENABLED = True
+
+# Issue diagnostics: suggested actions per reason code (used by Issues panel + Excel sheet)
+_SUGGESTED_ACTIONS = {
+    "NO_ROOM_CAPACITY": "Increase room capacity at this centre or split the class into smaller groups",
+    "SLOT_ROOM":        "Room exists but fully booked — check for scheduling conflicts",
+    "SLOT_TEACHER":     "Room available but no teacher free — check teacher loading panel",
+    "SLOT_H9":          "Student group has conflicting class on same day — cannot share that day",
+    "SLOT_H6":          "No valid TKO time slot available (class must start at or after 10:00)",
+    "TEACHER_NONE":     "Add a teacher with this subject qualification to the Teachers sheet",
+    "TEACHER_CAPACITY": "All qualified teachers at weekly cap — add more or reduce other sessions",
+    "TEACHER_AVAIL":    "All qualified teachers unavailable on the scheduled day",
+    "TEACHER_H8":       "No teacher can reach this centre within 90 min from prior commitment",
+    "H3_TS_TM":         "J1 assumption applied: TS→TM cross-centre assigned — confirm with Jo",
+    "H3_FALLBACK":      "J8 assumption applied: class moved to fallback centre — confirm with Jo",
+    "NET_SHORTFALL":    "Add more Net teachers to the Net Teachers sheet",
+    "CADET_ERROR":      "Cadet class could not be placed on Mon/Wed/Fri",
+}
 
 # CC Combine: max travel time (minutes) from any group's home centre to the CC centre
 # None = no distance filter (default until Jo confirms threshold, pending J2)
@@ -547,12 +564,16 @@ def _allowed_centres_for_group(group_code: str) -> list:
     return [primary]
 
 
-def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) -> Optional[str]:
+def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) -> tuple:
     """
-    Return the preferred room for a class group.
-    1. Exact match from group code  (TW2 → TW-TW2, CS1 → CSW-C1)
-    2. Largest room at allowed centres with enough seats (TS→TM if _TS_TM_ENABLED)
-    Returns None if no room fits — caller skips class rather than violating H3.
+    Return (room_code, centre_used) for a class group.
+    centre_used differs from home centre when J8 cross-centre fallback fires.
+    Returns (None, None) if no room found anywhere within travel limit.
+
+    Search order:
+    1. Exact match from group code (TW2 → TW - TW2, CS1 → CSW - C1)
+    2. Largest room at allowed centres (home + TM for TS when J1 enabled)
+    3. J8 assumption: nearest centre within _H8_MAX_TRAVEL_MIN minutes
     """
     centre    = _group_to_room_centre(group_code)
     num_match = re.search(r"\d+$", group_code)
@@ -564,9 +585,9 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
             row = conn.execute(
                 "SELECT code FROM rooms WHERE code = ?", (candidate,)).fetchone()
             if row:
-                return row[0]
+                return row[0], centre
 
-    # Fallback: largest room at each allowed centre
+    # Fallback: largest room at each allowed centre (includes TM for TS when J1 enabled)
     for allowed_centre in _allowed_centres_for_group(group_code):
         row = conn.execute("""
             SELECT code FROM rooms
@@ -574,9 +595,25 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
             ORDER BY capacity DESC LIMIT 1
         """, (allowed_centre, student_count)).fetchone()
         if row:
-            return row[0]
+            return row[0], allowed_centre
 
-    return None  # no room at correct centre — do not violate H3 by using wrong centre
+    # J8 assumption: try nearest centres within H8 travel limit
+    allowed = _allowed_centres_for_group(group_code)
+    nearby = sorted(
+        [(c, _travel_mins(centre, c)) for c in _TRAVEL_TIME.get(centre, {})
+         if c not in allowed and _travel_mins(centre, c) <= _H8_MAX_TRAVEL_MIN],
+        key=lambda x: x[1]
+    )
+    for fb_centre, _ in nearby:
+        row = conn.execute("""
+            SELECT code FROM rooms
+            WHERE centre = ? AND capacity >= ?
+            ORDER BY capacity DESC LIMIT 1
+        """, (fb_centre, student_count)).fetchone()
+        if row:
+            return row[0], fb_centre
+
+    return None, None  # no room anywhere within travel limit
 
 
 def _room_free(conn: sqlite3.Connection, room: str, day: str, slot: str) -> bool:
@@ -664,8 +701,9 @@ def auto_assign_schedule(conn: sqlite3.Connection,
     cc_only=True  → only process classes that have a cc_group set (Phase B)
     cc_only=False → only process classes with cc_group IS NULL (Phase A, default)
 
-    Returns (scheduled_count, unscheduled_list).
-    unscheduled_list entries: {"code": ..., "reason": ...}
+    Returns (scheduled_count, unscheduled_list, h3_exceptions_list).
+    unscheduled_list entries: {"code": ..., "reason_code": ..., "reason": ..., "category": ...}
+    h3_exceptions_list entries: {"code": ..., "from_centre": ..., "to_centre": ..., "reason_code": ...}
     """
     from collections import defaultdict
 
@@ -693,8 +731,9 @@ def auto_assign_schedule(conn: sqlite3.Connection,
     group_day_centre = {}                 # (group, day) -> centre  [H9]
     group_day_slots  = defaultdict(list)  # (group, day) -> [slot, ...]  [S2]
 
-    count       = 0
-    unscheduled = []   # {"code": ..., "reason": ...}
+    count         = 0
+    unscheduled   = []   # {"code": ..., "reason_code": ..., "reason": ..., "category": ...}
+    h3_exceptions = []   # H3 exceptions from J1/J8 assumptions
 
     for cls in classes:
         code     = cls["code"]
@@ -703,14 +742,29 @@ def auto_assign_schedule(conn: sqlite3.Connection,
         loading  = cls["loading_hrs"] or 4
         subj     = cls["subject_code"]
 
-        room = _pick_room(conn, group, students)
+        room, room_centre_assigned = _pick_room(conn, group, students)
         if not room:
             centre = cls["centre"] if "centre" in cls.keys() else group
-            unscheduled.append({"code": code,
-                                "reason": f"no room at {centre} with capacity >= {students}"})
+            unscheduled.append({
+                "code":        code,
+                "reason_code": "NO_ROOM_CAPACITY",
+                "reason":      f"no room at {centre} with capacity >= {students}",
+                "category":    "DATA_PROBLEM",
+            })
             continue
 
-        # Derive room centre for H9 check
+        # Track H3 exceptions when J1/J8 fallback assigned a different centre
+        home_centre = cls["centre"] if "centre" in cls.keys() else _group_to_room_centre(group)
+        if room_centre_assigned != home_centre:
+            rc = "H3_TS_TM" if home_centre == "TS" else "H3_FALLBACK"
+            h3_exceptions.append({
+                "code":        code,
+                "from_centre": home_centre,
+                "to_centre":   room_centre_assigned,
+                "reason_code": rc,
+            })
+
+        # Derive room centre for H9/H6 checks (authoritative from DB)
         room_centre_row = conn.execute(
             "SELECT centre FROM rooms WHERE code=?", (room,)).fetchone()
         room_centre = room_centre_row[0] if room_centre_row else None
@@ -722,8 +776,9 @@ def auto_assign_schedule(conn: sqlite3.Connection,
 
         offset    = subj_day_offset[subj]
         day_order = _DAY_PRIORITY[offset:] + _DAY_PRIORITY[:offset]
-        need_two  = loading >= 4
-        assigned  = False
+        need_two    = loading >= 4
+        assigned    = False
+        slot_blocks = {"SLOT_H9": 0, "SLOT_ROOM": 0, "SLOT_H6": 0, "SLOT_TEACHER": 0}
 
         for day in day_order:
             # H9: skip day if group is already at a different centre
@@ -731,6 +786,7 @@ def auto_assign_schedule(conn: sqlite3.Connection,
             committed = group_day_centre.get((group, day))
             if committed and room_centre and committed != room_centre:
                 if frozenset({committed, room_centre}) not in _H9_ALLOWED_CROSS_CENTRE:
+                    slot_blocks["SLOT_H9"] += 1
                     continue
 
             existing_slots = group_day_slots[(group, day)]
@@ -741,57 +797,78 @@ def auto_assign_schedule(conn: sqlite3.Connection,
                     start2 = slot2.split(" - ")[0]
                     cap = teacher_cap.get((subj, day, start1), 0)
                     if slot_used[(subj, day, start1)] >= cap:
+                        slot_blocks["SLOT_TEACHER"] += 1
                         continue
                     # S2: 4-hr block occupies both AM or both PM slots consecutively
                     if (_has_tiandi_violation(existing_slots, slot1) or
                             _has_tiandi_violation(existing_slots, slot2)):
                         continue
-                    if (_room_free(conn, room, day, slot1) and
+                    if not (_room_free(conn, room, day, slot1) and
                             _room_free(conn, room, day, slot2)):
-                        conn.execute("""
-                            INSERT OR REPLACE INTO schedule
-                                (class_code, group_code, day, time1, time2, room_code)
-                            VALUES (?,?,?,?,?,?)
-                        """, (code, group, day, slot1, slot2, room))
-                        slot_used[(subj, day, start1)] += 1
-                        slot_used[(subj, day, start2)] += 1
-                        group_day_centre[(group, day)] = room_centre
-                        group_day_slots[(group, day)].extend([slot1, slot2])
-                        count  += 1
-                        assigned = True
-                        break
+                        slot_blocks["SLOT_ROOM"] += 1
+                        continue
+                    conn.execute("""
+                        INSERT OR REPLACE INTO schedule
+                            (class_code, group_code, day, time1, time2, room_code)
+                        VALUES (?,?,?,?,?,?)
+                    """, (code, group, day, slot1, slot2, room))
+                    slot_used[(subj, day, start1)] += 1
+                    slot_used[(subj, day, start2)] += 1
+                    group_day_centre[(group, day)] = room_centre
+                    group_day_slots[(group, day)].extend([slot1, slot2])
+                    count  += 1
+                    assigned = True
+                    break
             else:
                 for slot in single_slots:
                     start = slot.split(" - ")[0]
                     cap = teacher_cap.get((subj, day, start), 0)
                     if slot_used[(subj, day, start)] >= cap:
+                        slot_blocks["SLOT_TEACHER"] += 1
                         continue
                     # S2: check adding this slot doesn't create a gap
                     if _has_tiandi_violation(existing_slots, slot):
                         continue
-                    if _room_free(conn, room, day, slot):
-                        conn.execute("""
-                            INSERT OR REPLACE INTO schedule
-                                (class_code, group_code, day, time1, time2, room_code)
-                            VALUES (?,?,?,?,NULL,?)
-                        """, (code, group, day, slot, room))
-                        slot_used[(subj, day, start)] += 1
-                        group_day_centre[(group, day)] = room_centre
-                        group_day_slots[(group, day)].append(slot)
-                        count  += 1
-                        assigned = True
-                        break
+                    if not _room_free(conn, room, day, slot):
+                        slot_blocks["SLOT_ROOM"] += 1
+                        continue
+                    conn.execute("""
+                        INSERT OR REPLACE INTO schedule
+                            (class_code, group_code, day, time1, time2, room_code)
+                        VALUES (?,?,?,?,NULL,?)
+                    """, (code, group, day, slot, room))
+                    slot_used[(subj, day, start)] += 1
+                    group_day_centre[(group, day)] = room_centre
+                    group_day_slots[(group, day)].append(slot)
+                    count  += 1
+                    assigned = True
+                    break
             if assigned:
                 break
 
         if assigned:
             subj_day_offset[subj] = (offset + 1) % len(_DAY_PRIORITY)
         else:
-            unscheduled.append({"code": code,
-                                "reason": "no free slot across all days (room/teacher capacity exhausted)"})
+            # Determine primary blocking reason (priority: H9 > SLOT_ROOM > SLOT_TEACHER)
+            # Note: TKO H6 (start ≥10:00) is pre-filtered via _TKO_TIME_BLOCKS — not an explicit block
+            days_tried = len(day_order)
+            if slot_blocks["SLOT_H9"] > 0 and slot_blocks["SLOT_H9"] >= days_tried:
+                rc, cat = "SLOT_H9", "ALGORITHM_ISSUE"
+            elif is_tko and (slot_blocks["SLOT_ROOM"] + slot_blocks["SLOT_TEACHER"]) == 0:
+                rc, cat = "SLOT_H6", "ALGORITHM_ISSUE"   # TKO with no valid slots at all
+            elif slot_blocks["SLOT_ROOM"] >= slot_blocks["SLOT_TEACHER"]:
+                rc, cat = "SLOT_ROOM", "ALGORITHM_ISSUE"
+            else:
+                rc, cat = "SLOT_TEACHER", "ALGORITHM_ISSUE"
+            unscheduled.append({
+                "code":        code,
+                "reason_code": rc,
+                "reason":      f"no free slot: {rc} (H9={slot_blocks['SLOT_H9']}, room={slot_blocks['SLOT_ROOM']}, teacher={slot_blocks['SLOT_TEACHER']})",
+                "category":    cat,
+            })
 
     conn.commit()
-    return count, unscheduled
+    return count, unscheduled, h3_exceptions
 
 
 # ─── Phase 2c: CC Combine scheduling (L1 / L2 / H5 / S4) ────────────────────
@@ -981,7 +1058,9 @@ def assign_teachers(conn: sqlite3.Connection):
       Pass 3: quota relaxed + H4 cap relaxed (→ H4_OVERLOAD warning), H8 still enforced
       Pass 4: quota relaxed + H4 relaxed + avail ignored (→ S1 warning), H8 still enforced
 
-    Returns (unassigned_list, warnings_list).
+    Returns (unassigned_list, warnings_list, unassigned_detail_list).
+    unassigned_list: list[str] — class codes (backward compat)
+    unassigned_detail_list: list[dict] — {code, subj, centre, students, reason_code, reason, category}
     warnings_list entries have keys: class, teacher, day, reason.
     """
     classes = conn.execute("""
@@ -992,8 +1071,9 @@ def assign_teachers(conn: sqlite3.Connection):
         ORDER BY c.student_count DESC
     """).fetchall()
 
-    unassigned = []
-    warnings   = []
+    unassigned        = []   # list[str] — backward compat
+    warnings          = []
+    unassigned_detail = []   # list[dict] — with reason codes
 
     for cls in classes:
         code      = cls["class_code"]
@@ -1045,7 +1125,35 @@ def assign_teachers(conn: sqlite3.Connection):
                 warn_reason = "S1: teacher assigned to unavailable slot (loading also exceeded)"
 
         if not lec1:
+            # Diagnostic: determine why all 5 passes failed
+            qual_count = conn.execute(
+                "SELECT COUNT(*) FROM teacher_subjects WHERE subject_code = ?",
+                (subj,)).fetchone()[0]
+            if qual_count == 0:
+                t_rc, t_cat = "TEACHER_NONE", "DATA_PROBLEM"
+            else:
+                t_rc, t_cat = "TEACHER_CAPACITY", "DATA_PROBLEM"
+
+            # Enrich with centre/student info for issues sheet
+            centre_info = conn.execute("""
+                SELECT cg.centre, c.student_count
+                FROM classes c
+                JOIN class_groups cg ON cg.code = c.group_code
+                WHERE c.code = ?
+            """, (code,)).fetchone()
+            t_centre   = centre_info["centre"]        if centre_info else ""
+            t_students = centre_info["student_count"] if centre_info else 0
+
             unassigned.append(code)
+            unassigned_detail.append({
+                "code":        code,
+                "subj":        subj,
+                "centre":      t_centre,
+                "students":    t_students,
+                "reason_code": t_rc,
+                "reason":      f"teacher assignment failed: {t_rc} for subject {subj}",
+                "category":    t_cat,
+            })
         else:
             teacher_name = conn.execute(
                 "SELECT name FROM teachers WHERE id=?", (lec1,)).fetchone()
@@ -1088,7 +1196,7 @@ def assign_teachers(conn: sqlite3.Connection):
             """, (lec1, subj))
 
     conn.commit()
-    return unassigned, warnings
+    return unassigned, warnings, unassigned_detail
 
 
 def _get_teacher_day_centre(conn, teacher_id: int, day: str):
@@ -1349,7 +1457,8 @@ _DAY_ABBR    = {"Monday": "Mon", "Tuesday": "Tue", "Wednesday": "Wed",
                 "Thursday": "Thu", "Friday": "Fri"}
 
 
-def write_output_fast(results: list, english_weekly: dict = None) -> bytes:
+def write_output_fast(results: list, english_weekly: dict = None,
+                      issues: list = None, assumptions: list = None) -> bytes:
     """Build a new clean workbook from results — no original formatting loaded.
     Runs in < 1 s vs 47 s for the modify-in-place approach."""
     from io import BytesIO
@@ -1423,6 +1532,42 @@ def write_output_fast(results: list, english_weekly: dict = None) -> bytes:
                 for blk in _ENG_WEEK_BLOCKS:
                     row_data.append(english_weekly.get((r["class_code"], term, blk)) or "")
             ws_eng.append(row_data)
+
+    # ── Issues sheet ─────────────────────────────────────────────────────────
+    if issues:
+        from openpyxl.styles import Font
+        ws_issues = wb.create_sheet("Issues")
+        headers = ["Class Code", "Centre", "Subject", "Students",
+                   "Category", "Reason Code", "Reason", "Suggested Action"]
+        ws_issues.append(headers)
+        for cell in ws_issues[1]:
+            cell.font = Font(bold=True)
+        cat_order = {"DATA_PROBLEM": 0, "ALGORITHM_ISSUE": 1, "ASSUMPTION": 2}
+        sorted_issues = sorted(
+            issues, key=lambda x: cat_order.get(x.get("category", "DATA_PROBLEM"), 3))
+        for item in sorted_issues:
+            ws_issues.append([
+                item.get("code", ""),
+                item.get("centre", ""),
+                item.get("subj", ""),
+                item.get("students", 0),
+                item.get("category", ""),
+                item.get("reason_code", ""),
+                item.get("reason", ""),
+                item.get("suggested", ""),
+            ])
+        if assumptions:
+            ws_issues.append([])
+            ws_issues.append(["--- ASSUMPTIONS (pending Jo confirmation) ---"])
+            ws_issues.append(["Question", "Assumption", "Count", "Affected Classes"])
+            for a in assumptions:
+                affected = a.get("affected", [])
+                ws_issues.append([
+                    a.get("question", ""),
+                    a.get("assumption", ""),
+                    len(affected),
+                    ", ".join(affected[:20]),
+                ])
 
     buf = BytesIO()
     wb.save(buf)
@@ -1677,11 +1822,15 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     gc.collect()
 
     unscheduled_rooms = []
+    core_h3           = []
+    unassigned_detail = []
+    all_issues        = []
+    assumptions_list  = []
     if n_sched == 0:
         # Phase 0: pre-schedule cadet classes (fixed Mon/Wed/Fri rooms)
         _cadet_count, cadet_errors = phase0_schedule_cadets(conn)
         # Phase A: schedule Core classes (no cc_group)
-        _core_count, core_unscheduled = auto_assign_schedule(conn, cc_only=False)
+        _core_count, core_unscheduled, core_h3 = auto_assign_schedule(conn, cc_only=False)
         unscheduled_rooms.extend(core_unscheduled)
         # Phase B: schedule CC Combine classes (cc_group set)
         cc_assigned, cc_errors = cc_assign_schedule(conn)
@@ -1690,12 +1839,13 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
         cc_errors    = []
     # else: Class list answer already filled → use existing schedule as-is
 
-    unassigned, s1_warnings = assign_teachers(conn)
+    unassigned, s1_warnings, unassigned_detail = assign_teachers(conn)
     english_weekly = assign_english_weekly(conn)    # Phase 3b
     results        = collect_results(conn)
     stats          = collect_stats(conn, results, unassigned, s1_warnings)
-    stats["unscheduled_rooms"]  = unscheduled_rooms
+    stats["unscheduled_rooms"]    = unscheduled_rooms
     stats["english_weekly_count"] = len(english_weekly)
+    # stats["issues"] and stats["assumptions"] set after enrichment block below
 
     all_errors = cadet_errors + cc_errors if n_sched == 0 else []
     if all_errors:
@@ -1708,6 +1858,83 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
     # Collect Net teacher names before conn is released
     net_names = {r["name"] for r in conn.execute(
         "SELECT name FROM teachers WHERE is_net=1").fetchall()}
+
+    # Enrich unscheduled items with subject/centre/students (must be before del conn)
+    enriched_unscheduled = []
+    for item in unscheduled_rooms:
+        row = conn.execute("""
+            SELECT c.student_count, c.subject_code, cg.centre
+            FROM classes c
+            JOIN class_groups cg ON cg.code = c.group_code
+            WHERE c.code = ?
+        """, (item["code"],)).fetchone()
+        enriched_unscheduled.append({
+            **item,
+            "students": row["student_count"]  if row else 0,
+            "subj":     row["subject_code"]   if row else "",
+            "centre":   row["centre"]          if row else "",
+        })
+    unscheduled_rooms = enriched_unscheduled
+
+    # Build unified issues list with categories and suggested actions
+    all_issues = []
+    for item in unscheduled_rooms:
+        rc = item.get("reason_code", "NO_ROOM_CAPACITY")
+        all_issues.append({
+            "code":        item["code"],
+            "subj":        item.get("subj", ""),
+            "centre":      item.get("centre", ""),
+            "students":    item.get("students", 0),
+            "reason_code": rc,
+            "reason":      item["reason"],
+            "category":    item.get("category", "DATA_PROBLEM"),
+            "suggested":   _SUGGESTED_ACTIONS.get(rc, "Contact Jo"),
+        })
+    for item in unassigned_detail:
+        rc = item.get("reason_code", "TEACHER_NONE")
+        all_issues.append({
+            "code":        item["code"],
+            "subj":        item.get("subj", ""),
+            "centre":      item.get("centre", ""),
+            "students":    item.get("students", 0),
+            "reason_code": rc,
+            "reason":      item["reason"],
+            "category":    item.get("category", "DATA_PROBLEM"),
+            "suggested":   _SUGGESTED_ACTIONS.get(rc, "Contact Jo"),
+        })
+    for exc in core_h3:
+        rc = exc.get("reason_code", "H3_FALLBACK")
+        all_issues.append({
+            "code":        exc["code"],
+            "subj":        "",
+            "centre":      exc.get("from_centre", ""),
+            "students":    0,
+            "reason_code": rc,
+            "reason":      f"H3 exception: {exc.get('from_centre','')} → {exc.get('to_centre','')}",
+            "category":    "ASSUMPTION",
+            "suggested":   _SUGGESTED_ACTIONS.get(rc, "Confirm with Jo"),
+        })
+
+    # Build assumptions list (for UI and Excel)
+    j1_affected = [e["code"] for e in core_h3 if e.get("reason_code") == "H3_TS_TM"]
+    j8_affected = [e["code"] for e in core_h3 if e.get("reason_code") == "H3_FALLBACK"]
+    assumptions_list = []
+    if j1_affected:
+        assumptions_list.append({
+            "question":   "J1",
+            "assumption": "TS→TM cross-centre enabled",
+            "affected":   j1_affected,
+        })
+    if j8_affected:
+        assumptions_list.append({
+            "question":   "J8",
+            "assumption": "Cross-centre room fallback applied",
+            "affected":   j8_affected,
+        })
+
+    # Assign now — after enrichment built the final lists
+    stats["issues"]      = all_issues
+    stats["assumptions"] = assumptions_list
 
     del conn
     gc.collect()
@@ -1731,7 +1958,12 @@ def run_v4_from_bytes(excel_bytes: bytes) -> tuple:
                         "reason":  f"English Net shortfall: {net_cnt}/{_ENG_NET_MIN_BLOCKS} Net blocks in {term} (insufficient Net teacher supply)",
                     })
 
-    output_bytes = write_output_fast(results, english_weekly=english_weekly)
+    output_bytes = write_output_fast(
+        results,
+        english_weekly=english_weekly,
+        issues=stats.get("issues"),
+        assumptions=stats.get("assumptions"),
+    )
     return output_bytes, stats
 
 
