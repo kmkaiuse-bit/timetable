@@ -14,7 +14,7 @@ import openpyxl
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC  = os.path.join(HERE, "data/input/Planning for Timetable (clean).xlsx")
-DST  = os.path.join(HERE, "data/input/Planning for Timetable — English.xlsx")
+DST  = os.path.join(HERE, "data/input/Planning for Timetable - English.xlsx")
 
 ENG_TEACHERS = {
     "Ms. Lee Kit Wan", "Ms. Elise Ye", "Mr. Peter Barrett", "Ms. Cherry Ip",
