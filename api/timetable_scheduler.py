@@ -2252,6 +2252,9 @@ def run_v4_from_bytes(excel_bytes: bytes, term_dates: dict = None) -> tuple:
     stats["issues"]      = all_issues
     stats["assumptions"] = assumptions_list
     stats["true_total"]  = (stats.get("total_classes") or 0) + len(unscheduled_rooms)
+    # Expose HK holidays + term starts so the UI can render the semester calendar.
+    stats["hk_holidays"] = sorted(_HK_HOLIDAYS)
+    stats["term_dates"]  = term_dates or {}
 
     del conn
     gc.collect()

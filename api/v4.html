@@ -113,6 +113,35 @@
     td { padding: 7px 14px; border-bottom: 1px solid var(--border-s); color: var(--body); }
     tbody tr:last-child td { border-bottom: none; }
     td:first-child { font-weight: 600; }
+    .view-switch { display: inline-flex; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+    .view-btn { padding: 7px 16px; border: none; background: transparent; color: var(--muted); font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s, color .15s; border-right: 1px solid var(--border); }
+    .view-btn:last-child { border-right: none; }
+    .view-btn.active { background: var(--accent); color: #fff; }
+    .view-btn:hover:not(.active) { background: var(--border); color: var(--text); }
+    /* Week overview: room × (day × slot) */
+    .week-table { border-collapse: collapse; font-size: .68rem; }
+    .week-table th, .week-table td { border: 1px solid var(--border); padding: 3px 5px; text-align: center; white-space: nowrap; }
+    .week-table thead th { background: var(--accent); color: #fff; font-weight: 600; position: sticky; top: 0; }
+    .week-table th.day-sep, .week-table td.day-sep { border-left: 2px solid #94a3b8; }
+    .week-table td.room-lbl { white-space: nowrap; font-weight: 600; color: #374151; text-align: left; background: #f8fafc; position: sticky; left: 0; }
+    .week-table tr.centre-row td { background: #f1f5f9; font-weight: 700; color: #475569; text-align: left; font-size: .7rem; }
+    .week-cell { line-height: 1.25; }
+    .week-cell .wc-code { font-weight: 700; }
+    .week-cell .wc-lec { color: #6b7280; }
+    .week-cell.conflict { background: #fee2e2 !important; outline: 2px solid #dc2626; outline-offset: -2px; }
+    .week-table td.tload { color: #94a3b8; font-weight: 400; font-size: .62rem; }
+    /* Month / semester calendar */
+    .cal-wrap { display: flex; flex-wrap: wrap; gap: 24px; }
+    .cal-term { flex: 1 1 340px; }
+    .cal-term h4 { margin: 0 0 8px; font-size: .9rem; color: var(--text); }
+    .cal-table { border-collapse: collapse; font-size: .72rem; width: 100%; }
+    .cal-table th, .cal-table td { border: 1px solid var(--border); padding: 5px 4px; text-align: center; }
+    .cal-table thead th { background: var(--accent); color: #fff; font-weight: 600; }
+    .cal-table td.wk-lbl { background: #f8fafc; font-weight: 600; color: #64748b; white-space: nowrap; }
+    .cal-table td.holiday { background: #fee2e2; color: #b91c1c; font-weight: 600; }
+    .cal-table td .cal-date { font-size: .72rem; }
+    .cal-table td .cal-hol { display: block; font-size: .58rem; line-height: 1.1; margin-top: 1px; }
+    .cal-hint { color: var(--muted); font-size: .82rem; padding: 10px 0; }
     #dayTabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 14px; }
     .day-tab { padding: 8px 18px; border: none; background: transparent; color: var(--muted); font-size: .84rem; font-weight: 600; cursor: pointer; position: relative; transition: color .18s; font-family: inherit; }
     .day-tab::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 2px; background: var(--accent); transform: scaleX(0); transition: transform .2s ease; }
@@ -327,6 +356,12 @@
     <!-- Timetable Grid -->
     <div style="margin-top:28px">
       <div class="results-title">時間表 Timetable</div>
+      <div id="viewSwitch" class="view-switch">
+        <button class="view-btn active" data-view="day">日 Day</button>
+        <button class="view-btn" data-view="week">週·課室</button>
+        <button class="view-btn" data-view="teacher">週·老師</button>
+        <button class="view-btn" data-view="month">月 學期曆</button>
+      </div>
       <div id="dayTabs"></div>
       <div id="gridContainer" style="overflow-x:auto;"></div>
     </div>
@@ -637,6 +672,7 @@
     state.results = stats.results || []; state.editedCodes = new Set(); updateEditBadge();
     state.crossCentreMap = buildCrossCentreMap(stats.assumptions);
     state.allRooms = stats.all_rooms || [];
+    state.stats = stats;
     const total = stats.total_classes, sched = stats.scheduled;
     const trueTotal = stats.true_total || total;
     const unscheduledCount = trueTotal - total;
@@ -829,6 +865,7 @@
 
     document.getElementById('downloadBtn').onclick = e => { e.preventDefault(); downloadEdited(); };
     renderGrid(stats.timetable_grid || {});
+    setView('day');
     show('results', true);
   }
 
@@ -893,6 +930,133 @@
     _activeDay=day;
     document.querySelectorAll('.day-tab').forEach(b=>b.classList.toggle('active',b.dataset.day===day));
     showDayGrid(day);
+  }
+
+  // ── View switcher: Day / Week / Month ───────────────────────────────────────
+  let _viewMode='day';
+  document.getElementById('viewSwitch').addEventListener('click',e=>{
+    const btn=e.target.closest('.view-btn'); if(btn) setView(btn.dataset.view);
+  });
+  function setView(mode){
+    _viewMode=mode;
+    document.querySelectorAll('.view-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===mode));
+    const dayTabs=document.getElementById('dayTabs');
+    if(mode==='day'){ dayTabs.style.display=''; rebuildGrid(); renderGrid(_grid); }
+    else{
+      dayTabs.style.display='none';
+      if(mode==='week') renderWeekOverview();
+      else if(mode==='teacher') renderTeacherWeek();
+      else renderMonthCalendar();
+    }
+  }
+
+  // Week by teacher: teachers (rows) × (day × slot); primary lecturer (lec1).
+  // A slot holding >1 class for the same teacher = double-booking → flagged.
+  function renderTeacherWeek(){
+    const cont=document.getElementById('gridContainer');
+    const rows=state.results.filter(r=>r.day&&r.lec1);
+    if(!rows.length){ cont.innerHTML='<p class="cal-hint">未有已排班的課堂。</p>'; return; }
+    const days=DAY_ORDER.filter(d=>rows.some(r=>r.day===d));
+    const slotSet=new Set();
+    rows.forEach(r=>[r.time1,r.time2].filter(Boolean).forEach(s=>slotSet.add(s)));
+    const slots=[...slotSet].sort((a,b)=>slotStart(a)-slotStart(b));
+    const map={}, load={};
+    rows.forEach(r=>{
+      const t=r.lec1; load[t]=(load[t]||0)+1;
+      [r.time1,r.time2].filter(Boolean).forEach(s=>{
+        (((map[t]=map[t]||{})[r.day]=map[t][r.day]||{})[s]=map[t][r.day][s]||[]).push(r.class_code);
+      });
+    });
+    const tlist=Object.keys(map).sort();
+    let h1='<th rowspan="2" class="room-lbl">Teacher</th>', h2='';
+    days.forEach((d,di)=>{ h1+=`<th colspan="${slots.length}"${di?' class="day-sep"':''}>${d.slice(0,3)}</th>`; slots.forEach((s,si)=> h2+=`<th${(si===0&&di>0)?' class="day-sep"':''}>${s.split(' - ')[0]}</th>`); });
+    const body=tlist.map(t=>{
+      let cells='';
+      days.forEach((d,di)=>slots.forEach((s,si)=>{
+        const sep=(si===0&&di>0)?' day-sep':'';
+        const arr=((map[t]||{})[d]||{})[s]||[];
+        if(arr.length){
+          const conflict=arr.length>1;
+          const subj=(arr[0]||'').split('_')[0];
+          const label=arr.map(c=>c.includes('_')?c.split('_')[1]:c).join(' / ');
+          cells+=`<td class="week-cell slot-${subj}${sep}${conflict?' conflict':''}"><div class="wc-code">${label}</div></td>`;
+        } else cells+=`<td class="${sep}"></td>`;
+      }));
+      const nm=t.replace('Mr. ','').replace('Ms. ','');
+      return `<tr><td class="room-lbl">${nm} <span style="color:#94a3b8;font-weight:400">(${load[t]})</span></td>${cells}</tr>`;
+    }).join('');
+    cont.innerHTML=`<table class="week-table"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table>`;
+  }
+
+  function slotStart(s){ return parseInt((s||'').split(' - ')[0].replace(':','')) || 0; }
+
+  // Week overview: rooms (rows, grouped by centre) × (day × slot) columns.
+  function renderWeekOverview(){
+    rebuildGrid();
+    const days=DAY_ORDER.filter(d=>_grid[d]&&Object.keys(_grid[d]).length);
+    const cont=document.getElementById('gridContainer');
+    if(!days.length){ cont.innerHTML='<p class="cal-hint">未有已排班的課堂。</p>'; return; }
+    const slotSet=new Set();
+    days.forEach(d=>Object.values(_grid[d]).forEach(rm=>Object.keys(rm).forEach(s=>slotSet.add(s))));
+    const slots=[...slotSet].sort((a,b)=>slotStart(a)-slotStart(b));
+    const rooms=(state.allRooms&&state.allRooms.length)?state.allRooms
+                :[...new Set(days.flatMap(d=>Object.keys(_grid[d])))].sort();
+    let h1='<th rowspan="2" class="room-lbl">Room</th>', h2='';
+    days.forEach((d,di)=>{
+      h1+=`<th colspan="${slots.length}"${di?' class="day-sep"':''}>${d.slice(0,3)}</th>`;
+      slots.forEach((s,si)=> h2+=`<th${(si===0&&di>0)?' class="day-sep"':''}>${s.split(' - ')[0]}</th>`);
+    });
+    const nCols=days.length*slots.length+1;
+    let prevC='';
+    const body=rooms.map(room=>{
+      const centre=room.split(' - ')[0]||room;
+      let ch='';
+      if(centre!==prevC){ prevC=centre; ch=`<tr class="centre-row"><td colspan="${nCols}">${centre}</td></tr>`; }
+      const lbl=room.includes(' - ')?room.split(' - ')[1]:room;
+      let cells='';
+      days.forEach((d,di)=>slots.forEach((s,si)=>{
+        const sep=(si===0&&di>0)?' day-sep':'';
+        const e=((_grid[d]||{})[room]||{})[s];
+        if(e){
+          const subj=(e.code||'').split('_')[0];
+          const short=(e.code||'').includes('_')?e.code.split('_')[1]:e.code;
+          cells+=`<td class="week-cell slot-${subj}${sep}"><div class="wc-code">${short}</div><div class="wc-lec">${e.lec1||''}</div></td>`;
+        } else cells+=`<td class="${sep}"></td>`;
+      }));
+      return ch+`<tr><td class="room-lbl">${lbl}</td>${cells}</tr>`;
+    }).join('');
+    cont.innerHTML=`<table class="week-table"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table>`;
+  }
+
+  // Month / semester calendar: 15 weeks × Mon-Fri per term, HK holidays marked.
+  function addDays(iso,n){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return d; }
+  function renderMonthCalendar(){
+    const stats=state.stats||{};
+    const holidays=new Set(stats.hk_holidays||[]);
+    const td=stats.term_dates||{};
+    const terms=[
+      {code:'T2025C', start: termT2025CInput.value || td.T2025C},
+      {code:'T2026A', start: termT2026AInput.value || td.T2026A},
+    ].filter(t=>t.start);
+    const cont=document.getElementById('gridContainer');
+    if(!terms.length){ cont.innerHTML='<p class="cal-hint">未輸入學期開始日 — 在上方「學期開始日 (第一週星期一)」填入日期後,即可顯示 15 週學期曆並標示公眾假期。</p>'; return; }
+    const WD=['Mon','Tue','Wed','Thu','Fri'];
+    const html=terms.map(t=>{
+      let rows='';
+      for(let w=0;w<15;w++){
+        let cells='';
+        for(let d=0;d<5;d++){
+          const dt=addDays(t.start,w*7+d);
+          const iso=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+          const isHol=holidays.has(iso);
+          cells+=`<td class="${isHol?'holiday':''}"><span class="cal-date">${dt.getMonth()+1}/${dt.getDate()}</span>${isHol?'<span class="cal-hol">假期</span>':''}</td>`;
+        }
+        rows+=`<tr><td class="wk-lbl">Wk ${w+1}</td>${cells}</tr>`;
+      }
+      return `<div class="cal-term"><h4>${t.code} — 15 週（起 ${t.start}）</h4>`+
+             `<table class="cal-table"><thead><tr><th>Week</th>${WD.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join('');
+    cont.innerHTML=`<div class="cal-wrap">${html}</div>`;
   }
 
   function rebuildGrid() {
