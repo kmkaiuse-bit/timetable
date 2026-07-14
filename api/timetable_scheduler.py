@@ -145,169 +145,18 @@ _TEACHER_WEEKLY_SESSION_CAP = 6
 
 # English Net teacher assignment constants (DAE102 only)
 _ENG_SUBJECT_CODE        = "DAE102"
-_ENG_NET_MIN_BLOCKS      = 2          # ≥2 Net teacher blocks per term per class
+_ENG_NET_MIN_BLOCKS      = 1          # ≥1 Net block per term = 20 Net hrs (J9 assumed; file: Hours = blocks × 20)
 _ENG_MAX_TRAVEL_MIN      = 30         # English teacher same-day travel cap (minutes)
 _ENG_TERMS               = ["T2025C", "T2026A"]
 _ENG_WEEK_BLOCKS         = ["wk1-5", "wk6-10", "wk11-15"]
 _ENG_NET_EXEMPT_GROUPS   = {"CS1", "CS2", "CS3", "CS7"}   # no Net hours requirement
 
-# Pre-assigned English (DAE102) teacher assignments for current planning period.
-# Source: English Teacher Arrangement.xlsx B3:K27
-# Format: {(class_code, term, block): teacher_name}
-# Loaded from "English Weekly" Excel sheet at runtime if present; this dict is the fallback.
-# Columns F-H = T2025C wk1-5/6-10/11-15; Columns I-K = T2026A wk1-5/6-10/11-15
-_ENG_WEEKLY_PREASSIGNED: dict = {
-    ("DAE102_CS1",  "T2025C", "wk1-5"):   "Mr. Ivan Yuen",
-    ("DAE102_CS1",  "T2025C", "wk6-10"):  "Mr. Ivan Yuen",
-    ("DAE102_CS1",  "T2025C", "wk11-15"): "Mr. Ivan Yuen",
-    ("DAE102_CS1",  "T2026A", "wk1-5"):   "Mr. Ivan Yuen",
-    ("DAE102_CS1",  "T2026A", "wk6-10"):  "Mr. Peter Barrett",
-    ("DAE102_CS1",  "T2026A", "wk11-15"): "Mr. Ivan Yuen",
-    ("DAE102_CS2",  "T2025C", "wk1-5"):   "Mr. Ivan Yuen",
-    ("DAE102_CS2",  "T2025C", "wk6-10"):  "Mr. Ivan Yuen",
-    ("DAE102_CS2",  "T2025C", "wk11-15"): "Mr. Ivan Yuen",
-    ("DAE102_CS2",  "T2026A", "wk1-5"):   "Mr. Ivan Yuen",
-    ("DAE102_CS2",  "T2026A", "wk6-10"):  "Mr. Peter Barrett",
-    ("DAE102_CS2",  "T2026A", "wk11-15"): "Mr. Ivan Yuen",
-    ("DAE102_CS3",  "T2025C", "wk1-5"):   "Mr. Ivan Yuen",
-    ("DAE102_CS3",  "T2025C", "wk6-10"):  "Mr. Ivan Yuen",
-    ("DAE102_CS3",  "T2025C", "wk11-15"): "Mr. Ivan Yuen",
-    ("DAE102_CS3",  "T2026A", "wk1-5"):   "Mr. Ivan Yuen",
-    ("DAE102_CS3",  "T2026A", "wk6-10"):  "Mr. Peter Barrett",
-    ("DAE102_CS3",  "T2026A", "wk11-15"): "Mr. Ivan Yuen",
-    ("DAE102_CS4",  "T2025C", "wk1-5"):   "Ms. Elise Ye",
-    ("DAE102_CS4",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_CS4",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_CS4",  "T2026A", "wk1-5"):   "Ms. Elise Ye",
-    ("DAE102_CS4",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_CS4",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_CS5",  "T2025C", "wk1-5"):   "Ms. Elise Ye",
-    ("DAE102_CS5",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_CS5",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_CS5",  "T2026A", "wk1-5"):   "Ms. Elise Ye",
-    ("DAE102_CS5",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_CS5",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_CS6",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_CS6",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_CS6",  "T2025C", "wk11-15"): "Mr. Ray Leung",
-    ("DAE102_CS6",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_CS6",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_CS6",  "T2026A", "wk11-15"): "Mr. Ray Leung",
-    ("DAE102_CS7",  "T2025C", "wk1-5"):   "Mr. Ivan Yuen",
-    ("DAE102_CS7",  "T2025C", "wk6-10"):  "Mr. Ivan Yuen",
-    ("DAE102_CS7",  "T2025C", "wk11-15"): "Mr. Ivan Yuen",
-    ("DAE102_CS7",  "T2026A", "wk1-5"):   "Mr. Ivan Yuen",
-    ("DAE102_CS7",  "T2026A", "wk6-10"):  "Mr. Peter Barrett",
-    ("DAE102_CS7",  "T2026A", "wk11-15"): "Mr. Ivan Yuen",
-    ("DAE102_WT1",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_WT1",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_WT1",  "T2025C", "wk11-15"): "Mr. Chris Hon",
-    ("DAE102_WT1",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_WT1",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_WT1",  "T2026A", "wk11-15"): "Mr. Chris Hon",
-    ("DAE102_WT2",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_WT2",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_WT2",  "T2025C", "wk11-15"): "Mr. Chris Hon",
-    ("DAE102_WT2",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_WT2",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_WT2",  "T2026A", "wk11-15"): "Mr. Chris Hon",
-    ("DAE102_SW1",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_SW1",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_SW1",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_SW1",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_SW1",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_SW1",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_TW1",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_TW1",  "T2025C", "wk6-10"):  "Ms. Elise Ye",
-    ("DAE102_TW1",  "T2025C", "wk11-15"): "Ms. Sasha Cheung",
-    ("DAE102_TW1",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_TW1",  "T2026A", "wk6-10"):  "Ms. Elise Ye",
-    ("DAE102_TW1",  "T2026A", "wk11-15"): "Ms. Sasha Cheung",
-    ("DAE102_TW2",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_TW2",  "T2025C", "wk6-10"):  "Ms. Elise Ye",
-    ("DAE102_TW2",  "T2025C", "wk11-15"): "Ms. Sasha Cheung",
-    ("DAE102_TW2",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_TW2",  "T2026A", "wk6-10"):  "Ms. Elise Ye",
-    ("DAE102_TW2",  "T2026A", "wk11-15"): "Ms. Sasha Cheung",
-    ("DAE102_TW3",  "T2025C", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_TW3",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_TW3",  "T2025C", "wk11-15"): "Mr. Ray Leung",
-    ("DAE102_TW3",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_TW3",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_TW3",  "T2026A", "wk11-15"): "Mr. Ray Leung",
-    ("DAE102_TM1",  "T2025C", "wk1-5"):   "Ms. Sasha Cheung",
-    ("DAE102_TM1",  "T2025C", "wk6-10"):  "Ms. Sasha Cheung",
-    ("DAE102_TM1",  "T2025C", "wk11-15"): "Mr. Peter Barrett",
-    ("DAE102_TM1",  "T2026A", "wk1-5"):   "Ms. Sasha Cheung",
-    ("DAE102_TM1",  "T2026A", "wk6-10"):  "Ms. Sasha Cheung",
-    ("DAE102_TM1",  "T2026A", "wk11-15"): "Mr. Peter Barrett",
-    ("DAE102_TM2",  "T2025C", "wk1-5"):   "Ms. Sasha Cheung",
-    ("DAE102_TM2",  "T2025C", "wk6-10"):  "Ms. Sasha Cheung",
-    ("DAE102_TM2",  "T2025C", "wk11-15"): "Mr. Peter Barrett",
-    ("DAE102_TM2",  "T2026A", "wk1-5"):   "Ms. Sasha Cheung",
-    ("DAE102_TM2",  "T2026A", "wk6-10"):  "Ms. Sasha Cheung",
-    ("DAE102_TM2",  "T2026A", "wk11-15"): "Mr. Peter Barrett",
-    ("DAE102_TM3",  "T2025C", "wk1-5"):   "Ms. Sasha Cheung",
-    ("DAE102_TM3",  "T2025C", "wk6-10"):  "Ms. Sasha Cheung",
-    ("DAE102_TM3",  "T2025C", "wk11-15"): "Mr. Peter Barrett",
-    ("DAE102_TM3",  "T2026A", "wk1-5"):   "Ms. Sasha Cheung",
-    ("DAE102_TM3",  "T2026A", "wk6-10"):  "Ms. Sasha Cheung",
-    ("DAE102_TM3",  "T2026A", "wk11-15"): "Mr. Peter Barrett",
-    ("DAE102_TM4",  "T2025C", "wk1-5"):   "Ms. Sasha Cheung",
-    ("DAE102_TM4",  "T2025C", "wk6-10"):  "Ms. Sasha Cheung",
-    ("DAE102_TM4",  "T2025C", "wk11-15"): "Mr. Peter Barrett",
-    ("DAE102_TM4",  "T2026A", "wk1-5"):   "Ms. Sasha Cheung",
-    ("DAE102_TM4",  "T2026A", "wk6-10"):  "Ms. Sasha Cheung",
-    ("DAE102_TM4",  "T2026A", "wk11-15"): "Mr. Peter Barrett",
-    ("DAE102_KT1",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_KT1",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_KT1",  "T2025C", "wk11-15"): "Mr. Chris Hon",
-    ("DAE102_KT1",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_KT1",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_KT1",  "T2026A", "wk11-15"): "Mr. Chris Hon",
-    ("DAE102_KT2",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_KT2",  "T2025C", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_KT2",  "T2025C", "wk11-15"): "Mr. Chris Hon",
-    ("DAE102_KT2",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_KT2",  "T2026A", "wk6-10"):  "Ms. Cherry Ip",
-    ("DAE102_KT2",  "T2026A", "wk11-15"): "Mr. Chris Hon",
-    ("DAE102_KT3",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_KT3",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_KT3",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_KT3",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_KT3",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_KT3",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_TK1",  "T2025C", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_TK1",  "T2025C", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_TK1",  "T2025C", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_TK1",  "T2026A", "wk1-5"):   "Ms. Cherry Ip",
-    ("DAE102_TK1",  "T2026A", "wk6-10"):  "Mr. Chris Hon",
-    ("DAE102_TK1",  "T2026A", "wk11-15"): "Ms. Cherry Ip",
-    ("DAE102_ST1",  "T2025C", "wk1-5"):   "Ms. Lee Kit Wan",
-    ("DAE102_ST1",  "T2025C", "wk6-10"):  "Mr. Peter Barrett",
-    ("DAE102_ST1",  "T2025C", "wk11-15"): "Ms. Lee Kit Wan",
-    ("DAE102_ST1",  "T2026A", "wk1-5"):   "Mr. Peter Barrett",
-    ("DAE102_ST1",  "T2026A", "wk6-10"):  "Ms. Lee Kit Wan",
-    ("DAE102_ST1",  "T2026A", "wk11-15"): "Ms. Lee Kit Wan",
-    ("DAE102_ST2",  "T2025C", "wk1-5"):   "Mr. Peter Barrett",
-    ("DAE102_ST2",  "T2025C", "wk6-10"):  "Ms. Elise Ye",
-    ("DAE102_ST2",  "T2025C", "wk11-15"): "Ms. Elise Ye",
-    ("DAE102_ST2",  "T2026A", "wk1-5"):   "Mr. Peter Barrett",
-    ("DAE102_ST2",  "T2026A", "wk6-10"):  "Ms. Elise Ye",
-    ("DAE102_ST2",  "T2026A", "wk11-15"): "Ms. Elise Ye",
-    ("DAE102_ST3",  "T2025C", "wk1-5"):   "Mr. Peter Barrett",
-    ("DAE102_ST3",  "T2025C", "wk6-10"):  "Ms. Elise Ye",
-    ("DAE102_ST3",  "T2025C", "wk11-15"): "Ms. Elise Ye",
-    ("DAE102_ST3",  "T2026A", "wk1-5"):   "Mr. Peter Barrett",
-    ("DAE102_ST3",  "T2026A", "wk6-10"):  "Ms. Elise Ye",
-    ("DAE102_ST3",  "T2026A", "wk11-15"): "Ms. Elise Ye",
-    ("DAE102_FL1",  "T2025C", "wk1-5"):   "Ms. Lee Kit Wan",
-    ("DAE102_FL1",  "T2025C", "wk6-10"):  "Mr. Peter Barrett",
-    ("DAE102_FL1",  "T2025C", "wk11-15"): "Ms. Lee Kit Wan",
-    ("DAE102_FL1",  "T2026A", "wk1-5"):   "Mr. Chris Hon",
-    ("DAE102_FL1",  "T2026A", "wk6-10"):  "Ms. Lee Kit Wan",
-    ("DAE102_FL1",  "T2026A", "wk11-15"): "Ms. Lee Kit Wan",
-}
+# English (DAE102) weekly assignments come from auto-assignment
+# (assign_english_weekly Mode 2), or from the input workbook's "English Weekly"
+# sheet when Jo fills it as an explicit override. The hard-coded copy of Jo's
+# arrangement was removed 2026-07-08 — it silently overrode auto-assignment.
+# Empty dict = no built-in fallback.
+_ENG_WEEKLY_PREASSIGNED: dict = {}
 
 # H8: max travel time (minutes) allowed for teacher to work two centres same day
 # Cross-centre pairs within this threshold → soft warning; beyond → hard block
@@ -329,7 +178,7 @@ _SUGGESTED_ACTIONS = {
     "TEACHER_H8":       "No teacher can reach this centre within 90 min from prior commitment",
     "H3_TS_TM":         "J1 assumption applied: TS→TM cross-centre assigned — confirm with Jo",
     "H3_FALLBACK":      "J8 assumption applied: class moved to fallback centre — confirm with Jo",
-    "NET_SHORTFALL":    "Add more Net teachers to the Net Teachers sheet",
+    "NET_SHORTFALL":    "Class shares a crowded slot and its centre is >30 min from the free Net teachers — reschedule to a lighter day/time, or accept no Net coverage. Adding Net teachers won't help if none can reach this centre at this slot.",
     "CADET_ERROR":      "Cadet class could not be placed on Mon/Wed/Fri",
 }
 
@@ -519,6 +368,50 @@ def _load_classes(conn: sqlite3.Connection, wb):
                      (code_str, subj_code, group, students, language, cc_group))
 
 
+# ─── Teacher name normalization ───────────────────────────────────────────────
+# The same person can appear under different honorifics across sheets — e.g.
+# "Mr. Cherry Ip" in the load table vs "Ms. Cherry Ip" in the Net / English
+# sheets. Matching on the honorific-stripped core keeps cross-sheet joins from
+# silently splitting one teacher into two records.
+
+_TITLE_RE = re.compile(r"^(mr|mrs|ms|miss|dr|prof)\.?\s+", re.IGNORECASE)
+
+
+def _canon_core(name) -> str:
+    """Lower-cased teacher name with any leading honorific removed."""
+    if not name:
+        return ""
+    core = _TITLE_RE.sub("", str(name).strip())
+    return " ".join(core.split()).lower()
+
+
+def _teacher_id_by_name(conn: sqlite3.Connection, name) -> Optional[int]:
+    """Resolve a teacher id, tolerating honorific differences. None if no match."""
+    if not name:
+        return None
+    name = str(name).strip()
+    row = conn.execute("SELECT id FROM teachers WHERE name = ?", (name,)).fetchone()
+    if row:
+        return row[0]
+    core = _canon_core(name)
+    if not core:
+        return None
+    for r in conn.execute("SELECT id, name FROM teachers").fetchall():
+        if _canon_core(r[1]) == core:
+            return r[0]
+    return None
+
+
+def _get_or_create_teacher(conn: sqlite3.Connection, name: str) -> int:
+    """Return the id of an existing teacher (matched by core) or insert a new one."""
+    tid = _teacher_id_by_name(conn, name)
+    if tid is not None:
+        return tid
+    conn.execute("INSERT INTO teachers (name) VALUES (?)", (name,))
+    return conn.execute(
+        "SELECT id FROM teachers WHERE name = ?", (name,)).fetchone()[0]
+
+
 def _load_teachers(conn: sqlite3.Connection, wb):
     ws  = wb["Teacher load table with subject"]
     raw = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
@@ -536,9 +429,7 @@ def _load_teachers(conn: sqlite3.Connection, wb):
         name    = str(name).strip()
         is_lec1 = row[0] is not None   # numbered row = primary (lec1)
 
-        conn.execute("INSERT OR IGNORE INTO teachers (name) VALUES (?)", (name,))
-        tid = conn.execute(
-            "SELECT id FROM teachers WHERE name = ?", (name,)).fetchone()[0]
+        tid = _get_or_create_teacher(conn, name)
 
         for i, subj_name in enumerate(subj_cols):
             if not subj_name:
@@ -591,11 +482,9 @@ def _load_availability(conn: sqlite3.Connection, wb):
         if not name:
             continue
         name = str(name).strip()
-        tid_row = conn.execute(
-            "SELECT id FROM teachers WHERE name = ?", (name,)).fetchone()
-        if not tid_row:
+        tid = _teacher_id_by_name(conn, name)
+        if tid is None:
             continue
-        tid = tid_row[0]
         for col_idx, day, start_time in slot_cols:
             val = row[col_idx] if col_idx < len(row) else None
             if val and str(val).strip().upper() == "N":
@@ -646,13 +535,12 @@ def _load_centre_preferences(conn: sqlite3.Connection, wb) -> int:
         name   = str(row[0]).strip()
         centre = str(row[1]).strip().upper()
         ptype  = str(row[2]).strip().lower() if len(row) > 2 and row[2] else "avoid"
-        tid_row = conn.execute(
-            "SELECT id FROM teachers WHERE name = ?", (name,)).fetchone()
-        if not tid_row:
+        tid = _teacher_id_by_name(conn, name)
+        if tid is None:
             continue
         conn.execute(
             "INSERT OR IGNORE INTO teacher_centre_preference VALUES (?,?,?)",
-            (tid_row[0], centre, ptype))
+            (tid, centre, ptype))
         count += 1
     return count
 
@@ -672,9 +560,11 @@ def _load_net_teachers(conn: sqlite3.Connection, wb) -> int:
         if not name:
             continue
         name = str(name).strip()
-        result = conn.execute(
-            "UPDATE teachers SET is_net=1 WHERE name=?", (name,))
-        count += result.rowcount
+        tid = _teacher_id_by_name(conn, name)
+        if tid is None:
+            continue
+        conn.execute("UPDATE teachers SET is_net=1 WHERE id=?", (tid,))
+        count += 1
     return count
 
 
@@ -1581,7 +1471,11 @@ def assign_english_weekly(conn: sqlite3.Connection,
         WHERE ts.subject_code = ?
     """, (_ENG_SUBJECT_CODE,)).fetchall()
     net_names  = {r["name"] for r in all_eng if r["is_net"]}
+    net_cores  = {_canon_core(r["name"]) for r in all_eng if r["is_net"]}
     name_to_id = {r["name"]: r["id"] for r in all_eng}
+    # Honorific-tolerant lookup so "Ms. Cherry Ip" in the English sheet still
+    # resolves to "Mr. Cherry Ip" in the load table (and vice versa).
+    core_to_id = {_canon_core(r["name"]): r["id"] for r in all_eng}
 
     warnings   = []
     assignments = {}   # (class_code, term, block) → teacher_name
@@ -1610,7 +1504,7 @@ def assign_english_weekly(conn: sqlite3.Connection,
                     continue
 
                 # Availability check (B44): warn if teacher marked unavailable
-                tid = name_to_id.get(teacher_name)
+                tid = name_to_id.get(teacher_name) or core_to_id.get(_canon_core(teacher_name))
                 if tid and day and start:
                     unavail = conn.execute("""
                         SELECT 1 FROM teacher_unavailability
@@ -1624,16 +1518,23 @@ def assign_english_weekly(conn: sqlite3.Connection,
                             "reason":  f"English Weekly: {teacher_name} unavailable on {day} {time1} ({term} {block})",
                         })
 
-                if teacher_name in net_names:
+                if teacher_name in net_names or _canon_core(teacher_name) in net_cores:
                     net_count += 1
 
             # Net requirement check (B46)
             if not exempt and net_count < _ENG_NET_MIN_BLOCKS:
                 warnings.append({
-                    "class":   class_code,
-                    "teacher": "",
-                    "day":     term,
-                    "reason":  f"English Net shortfall: {net_count}/{_ENG_NET_MIN_BLOCKS} Net blocks in {term} (insufficient Net teacher supply)",
+                    "class":       class_code,
+                    "code":        class_code,
+                    "centre":      info.get("centre", ""),
+                    "teacher":     "",
+                    "day":         term,
+                    "reason_code": "NET_SHORTFALL",
+                    "reason": (
+                        f"English Net shortfall: {net_count}/{_ENG_NET_MIN_BLOCKS} Net block in {term} "
+                        f"for {class_code} (pre-assigned English Weekly). Assign a Net teacher to a block "
+                        f"for this class, or accept no Net coverage."
+                    ),
                 })
 
     else:
@@ -1643,6 +1544,14 @@ def assign_english_weekly(conn: sqlite3.Connection,
         local_teachers = [r["id"] for r in all_eng if not r["is_net"]]
         id_to_name_map = {r["id"]: r["name"] for r in all_eng}
         net_available  = bool(net_teachers)
+
+        # How many English classes sit on each (day, time) slot — used to explain
+        # a Net shortfall (crowded slot + travel isolation, not lack of teachers).
+        slot_load = {}
+        for c in eng_classes:
+            k = (c["day"], c["time1"])
+            slot_load[k] = slot_load.get(k, 0) + 1
+        net_name_list = [id_to_name_map[t] for t in net_teachers if t in id_to_name_map]
 
         for term in _ENG_TERMS:
             block_day_used = defaultdict(set)
@@ -1657,6 +1566,14 @@ def assign_english_weekly(conn: sqlite3.Connection,
                 exempt     = group in _ENG_NET_EXEMPT_GROUPS
                 need_net   = 0 if (exempt or not net_available) else _ENG_NET_MIN_BLOCKS
                 net_given  = 0
+                start      = time1.split(" - ")[0].strip() if time1 else ""
+
+                # Teachers marked unavailable on this class's day/slot are off-limits.
+                unavail_here = set()
+                if day and start:
+                    unavail_here = {r[0] for r in conn.execute(
+                        "SELECT teacher_id FROM teacher_unavailability WHERE day=? AND start_time=?",
+                        (day, start)).fetchall()}
 
                 for block in _ENG_WEEK_BLOCKS:
                     used = block_day_used[(block, day, time1)]
@@ -1664,7 +1581,7 @@ def assign_english_weekly(conn: sqlite3.Connection,
                            else (local_teachers + net_teachers)
                     chosen = None
                     for tid in pool:
-                        if tid in used:
+                        if tid in used or tid in unavail_here:
                             continue
                         committed_centre = block_centre.get((block, tid, day))
                         if committed_centre and committed_centre != centre:
@@ -1680,13 +1597,25 @@ def assign_english_weekly(conn: sqlite3.Connection,
                         if chosen in net_teachers:
                             net_given += 1
 
-                # Net shortfall check
+                # Net shortfall check — report WHY (crowded slot + travel isolation)
                 if not exempt and net_given < need_net:
+                    n_share = slot_load.get((day, time1), 1) - 1
+                    net_lbl = " / ".join(
+                        n.replace("Mr. ", "").replace("Ms. ", "") for n in net_name_list
+                    ) or "Net teachers"
                     warnings.append({
-                        "class":   class_code,
-                        "teacher": "",
-                        "day":     term,
-                        "reason":  f"English Net shortfall: {net_given}/{_ENG_NET_MIN_BLOCKS} Net blocks in {term} (insufficient Net teacher supply)",
+                        "class":       class_code,
+                        "code":        class_code,
+                        "centre":      centre,
+                        "teacher":     "",
+                        "day":         term,
+                        "reason_code": "NET_SHORTFALL",
+                        "reason": (
+                            f"English Net shortfall: {net_given}/{_ENG_NET_MIN_BLOCKS} Net block in {term} "
+                            f"— {class_code} at {centre} {day} {start} shares this slot with {n_share} other "
+                            f"English class(es); no Net teacher ({net_lbl}) is both free and within "
+                            f"{_ENG_MAX_TRAVEL_MIN} min travel. Reschedule to a lighter slot or accept no Net coverage."
+                        ),
                     })
 
     return assignments, warnings
@@ -2276,6 +2205,26 @@ def run_v4_from_bytes(excel_bytes: bytes, term_dates: dict = None) -> tuple:
             "reason":      f"H3 exception: {exc.get('from_centre','')} → {exc.get('to_centre','')}",
             "category":    "ASSUMPTION",
             "suggested":   _SUGGESTED_ACTIONS.get(rc, "Confirm with Jo"),
+        })
+    # English Net shortfalls: surface in the Issues panel (deduped by class) so Jo
+    # sees the constraint and can decide whether to reschedule. One row per class.
+    seen_net = set()
+    for w in eng_warnings:
+        if w.get("reason_code") != "NET_SHORTFALL":
+            continue
+        code = w.get("code") or w.get("class", "")
+        if code in seen_net:
+            continue
+        seen_net.add(code)
+        all_issues.append({
+            "code":        code,
+            "subj":        _ENG_SUBJECT_CODE,
+            "centre":      w.get("centre", ""),
+            "students":    0,
+            "reason_code": "NET_SHORTFALL",
+            "reason":      w["reason"],
+            "category":    "ALGORITHM_ISSUE",
+            "suggested":   _SUGGESTED_ACTIONS.get("NET_SHORTFALL", "Contact Jo"),
         })
 
     # Build assumptions list with per-class centre detail (for UI, Excel, grid highlight)

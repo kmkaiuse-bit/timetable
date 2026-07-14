@@ -95,7 +95,8 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 | J6 | Teacher | Teacher assignment list — when available? | Teacher auto-assignment can't run without this |
 | J7 | CC | CC grouping full list — when available? | CC Combine can't run without this |
 | J8 | Rooms | FL/SW/TKO/ST/TM centres: classes with students > room capacity — split/relocate/accept? | **Assumed cross-centre fallback** in V6.3 (nearest centre ≤90 min); Issues panel shows all H3 exceptions |
-| J9 | English | 24 Net teacher shortfall warnings — acceptable? Or add Net teachers / change availability? | Reduce/eliminate `English Net shortfall` warnings |
+| J9 | English | Net requirement: is 1 five-week block = 20 Net hrs (so ≥1 block/term satisfies "≥20 Net hrs/term")? | **Assumed True** 2026-07-08 — `_ENG_NET_MIN_BLOCKS` set to 1; eliminated all false shortfall warnings |
+| J10 | English | KT1 (觀塘) + WT2 can't get a Net teacher under full auto-assign — both land on the crowded Tuesday 14:00 slot and are >30 min travel from where the 2 Net teachers are committed. Reschedule these 2 classes to a lighter slot, add a 3rd Net teacher positioned for KT/WT, or accept no Net coverage? | Surfaced in Issues panel (🔵 排班衝突) with diagnostic — **awaiting Jo's feedback**. Adding a 3rd Net teacher proven ineffective (test 2026-07-08). |
 
 ---
 
@@ -125,6 +126,7 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 | 2026-05-25 | V6.1 | `_TRAVEL_TIME` matrix, H8 soft gate, H3 toggle, S3 Phase 0, CC distance filter |
 | 2026-06-02 | V6.2 | Bug fixes B3/B4/B5, MRV ordering, English Net teacher weekly assignment |
 | 2026-06-09 | V6.3 | J1/J8 assumptions, reason codes, Issues panel + Excel sheet |
+| 2026-07-08 | V6.4 | English auto-assign fixes: removed hard-coded `_ENG_WEEKLY_PREASSIGNED`, honorific-tolerant teacher name matching, Mode-2 availability check, `_ENG_NET_MIN_BLOCKS` 2→1 (J9). Data-quality fixes via `scripts/build_clean_input.py` (English availability, Mr./Ms. unification, cleared English Weekly, **cleared Class list answer → true V4 auto-assign**). **True V4 result on clean input: 111/111 scheduled, 0 unassigned (beats Jo's V3 answer 105/107), 0 availability conflicts, 4 Net shortfalls (KT1, WT2 × 2 terms — genuine 2-Net-teacher supply limit). NOTE: earlier "0 conflict" figures were a V3-mode artifact — the real input had Class list answer pre-filled, so run_v4 was replaying Jo's days, not auto-scheduling.** English-only trial (`— English.xlsx`): 27/27 incl. added CS7 (Oct extra, student count assumed 35) |
 
 ### Next (unblocked)
 
@@ -172,3 +174,4 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 | `_CC_MAX_TRAVEL_MIN` | `None` | Jo confirms CC distance threshold (J2) |
 | `_H8_MAX_TRAVEL_MIN` | `90` | Adjust if Jo changes travel limit |
 | `_TEACHER_WEEKLY_SESSION_CAP` | `6` | Adjust if cap changes |
+| `_ENG_NET_MIN_BLOCKS` | `1` | Set to 2 if Jo confirms 1 block = 10 Net hrs (needs 2/term) — see J9 |
