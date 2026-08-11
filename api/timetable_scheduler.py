@@ -116,8 +116,12 @@ _MARKER_TO_SLOT = {
 # but all TKO rooms are stored as centre 'TKO'.
 _GROUP_CENTRE_ALIAS = {"CS": "CSW", "TK": "TKO"}
 
-# Day preference order: Mon > Tue > Thu > Wed > Fri
-_DAY_PRIORITY = ["Monday", "Tuesday", "Thursday", "Wednesday", "Friday"]
+# Day preference order for DAE subjects: Mon > Tue > Thu ONLY.
+# DAE classes are NOT scheduled on Wednesday or Friday (2026-08 requirement).
+# NOTE: Cadet classes are the explicit exception — they keep Mon/Wed/Fri and use
+# _CADET_DAY_PRIORITY (see Phase 0 / phase0_schedule_cadets). Do not add Wed/Fri
+# back here, and do not use _DAY_PRIORITY.index() on cadet days (would ValueError).
+_DAY_PRIORITY = ["Monday", "Tuesday", "Thursday"]
 
 # 4-hour blocks (two consecutive 2h slots on the same day).
 # Only non-overlapping blocks — the double-booking LIKE check would miss
@@ -1996,6 +2000,10 @@ def run_from_bytes(excel_bytes: bytes) -> tuple:
 
 
 _CADET_DAYS = {"Monday", "Wednesday", "Friday"}
+# Cadet day preference order (Mon > Wed > Fri). Kept separate from _DAY_PRIORITY
+# so that restricting DAE subjects to Mon/Tue/Thu does not affect cadet placement,
+# and so nothing calls _DAY_PRIORITY.index() on Wed/Fri (which are no longer in it).
+_CADET_DAY_PRIORITY = ["Monday", "Wednesday", "Friday"]
 
 
 def _is_cadet_class(class_code: str) -> bool:
@@ -2054,7 +2062,7 @@ def phase0_schedule_cadets(conn: sqlite3.Connection) -> tuple:
         single_slots = _TKO_SINGLE_SLOTS if centre == "TKO" else _SINGLE_SLOTS
 
         assigned = False
-        for day in sorted(_CADET_DAYS, key=lambda d: _DAY_PRIORITY.index(d)):
+        for day in _CADET_DAY_PRIORITY:
             if need_two:
                 for s1, s2 in time_blocks:
                     if _room_free(conn, room[0], day, s1) and _room_free(conn, room[0], day, s2):
