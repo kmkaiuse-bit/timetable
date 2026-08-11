@@ -111,18 +111,29 @@ per-teacher caps — no data source, not required).
 Excel workbook (`Timetable_V4_Output.xlsx`) with the timetable, an Issues sheet, semester
 calendar sheets (15 weeks with HK holidays), and teacher loading. Web UI mirrors these.
 
-## 8. Known limitations & capacity  *(measured 2026-08, auto-assign clean input)*
+## 8. Known limitations & capacity  *(measured 2026-08, auto-assign)*
 
-- Restricting DAE to 3 days concentrates demand and **worsens room shortage** (TS / FL /
-  TM already tight): on clean input, scheduled 111 → 94, SLOT_ROOM issues 1 → 14.
-- With Jo's combine data added, **16 classes remain unplaceable** (114 total, 98 placed):
-  - **7 core** — DAE101_TS4 and all FL (粉嶺): DAE103_FL1/2/3, DAE106_FL1/2/3.
-  - **9 combine** — 4 of 5 DAE106 combine groups fail (`_find_cc_day` L2 exhausted under
-    3 days); only KT3+KT4 places. Combining does reduce core room pressure (SLOT_ROOM
-    14 → 7) because combined classes share a room.
-- Root cause of both is the no-Wed/Fri rule (§5.1) plus FL room capacity. This is a
-  **capacity decision for Jo** (add FL rooms / accept unplaced / revise combine rules).
-  Wed/Fri use for DAE is explicitly ruled out by the requirement.
+- Restricting DAE to 3 days (Mon/Tue/Thu) concentrates demand and **worsens room
+  shortage** — FL / TS / CSW are the binding constraints (FL and TS each have only one
+  room; CSW's large rooms fill up).
+- **Room-capacity bug (fixed 2026-08).** `_pick_room` assigned each group its home room
+  by number (CS6 → CSW - C6) **without checking capacity**, so classes were silently
+  placed in rooms too small for them (e.g. DAE108_CS6, 33 students, in a 25-seat room).
+  This masked the true shortage: the reported "placed" count included many over-capacity
+  placements. After the fix (home room must fit; else best-fit search) **there are zero
+  over-capacity placements**, and the honest unplaced count is higher:
+  - clean input: **28 over-capacity placements → 0; unplaced 14 → 31**.
+  - a representative user file: 15 over-capacity → 0; unplaced 20 → 24.
+- **Combine helps only small classes.** Filling the CC Group column merges classes into
+  one shared room+slot, freeing rooms — but only when the merged total fits one room
+  (small groups). It cannot rescue the large FL/CSW classes that individually exceed room
+  capacity. The Phase-B combine placer was also fixed (2026-08) to try **all rooms and
+  all valid days** instead of the first only, so valid combines are no longer abandoned
+  prematurely (a user file's DAE102 TS→TM combines went from failing to placing;
+  unplaced 26 → 20 before the capacity fix).
+- **Bottom line — this is a capacity decision for Jo**, not a scheduler defect: add rooms
+  at FL / TS / CSW, relocate classes, or accept the honest unplaced list. Wed/Fri use for
+  DAE is explicitly ruled out by the requirement, so the 3-day ceiling stands.
 
 ## 9. Configurable toggles (`api/timetable_scheduler.py`)
 
@@ -152,3 +163,5 @@ New (2026-08, combine course):
 | 2026-05-23 → 06-09 | V6–V6.3 | Soft H4/H8, H6/H9 relaxations, reason codes, Issues panel, J1/J8 assumptions |
 | 2026-07-08 | V6.4 | English auto-assign fixes; true V4 on clean input (111/111) |
 | 2026-08-11 | 2026-08 | DAE Mon/Tue/Thu (cadet Mon/Wed/Fri); H4 soft-cap verified; UI (wide container, subject code, keep Wed/Fri); DAE106 combine groups captured |
+| 2026-08-11 | 2026-08b | Full-width UI; week-view cross-day drag + inline lecturer edit; UI shows combined classes' constituent classes; CC Group column + docs added to templates |
+| 2026-08-11 | 2026-08c | **Correctness fixes:** combine placer tries all rooms/valid days; `_pick_room` capacity check + best-fit (eliminates over-capacity placements — see §8) |
