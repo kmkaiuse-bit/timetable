@@ -965,12 +965,15 @@ def _select_cc_centre(conn: sqlite3.Connection, class_codes: list) -> list:
                   key=lambda c: (-centre_students[c], -_CENTRE_RANK.get(c, 0)))
 
 
-def _find_cc_day(conn: sqlite3.Connection, class_codes: list,
-                 centre: str) -> Optional[str]:
+def _find_cc_days(conn: sqlite3.Connection, class_codes: list,
+                  centre: str) -> list:
     """
-    L1: Find a day where NONE of the CC group's students already have a Core
-    class at a different centre.  Returns the first valid day or None.
+    L1: Return ALL days (in priority order) where NONE of the CC group's
+    students already have a Core class at a different centre. Returning every
+    valid day lets the caller try the next one when a day's rooms are full,
+    instead of aborting the whole group on the first candidate.
     """
+    valid = []
     for day in _DAY_PRIORITY:
         conflict = False
         for code in class_codes:
@@ -988,8 +991,8 @@ def _find_cc_day(conn: sqlite3.Connection, class_codes: list,
                 conflict = True
                 break
         if not conflict:
-            return day
-    return None
+            valid.append(day)
+    return valid
 
 
 def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
@@ -1054,8 +1057,8 @@ def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
         scheduled    = False
 
         for centre in centre_order:
-            day = _find_cc_day(conn, codes, centre)
-            if not day:
+            valid_days = _find_cc_days(conn, codes, centre)
+            if not valid_days:
                 continue
 
             # Find a suitable room at this centre
@@ -1064,15 +1067,14 @@ def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
                               (c,)).fetchone() or [0])[0]
                 for c in codes
             )
-            room = conn.execute("""
+            rooms = conn.execute("""
                 SELECT code FROM rooms
                 WHERE centre = ? AND capacity >= ?
-                ORDER BY capacity ASC LIMIT 1
-            """, (centre, total_students)).fetchone()
-            if not room:
+                ORDER BY capacity ASC
+            """, (centre, total_students)).fetchall()
+            if not rooms:
                 continue
 
-            room_code = room[0]
             loading   = conn.execute(
                 "SELECT loading_hrs FROM subjects WHERE code=?",
                 (subj,)).fetchone()
@@ -1081,35 +1083,44 @@ def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
             time_blocks = _TKO_TIME_BLOCKS if centre == "TKO" else _TIME_BLOCKS
             single_slots = _TKO_SINGLE_SLOTS if centre == "TKO" else _SINGLE_SLOTS
 
-            # Find a free slot on that day
-            slot1 = slot2 = None
-            if need_two:
-                for s1, s2 in time_blocks:
-                    if (_room_free(conn, room_code, day, s1) and
-                            _room_free(conn, room_code, day, s2)):
-                        slot1, slot2 = s1, s2
+            # Try each valid day; within a day try every room with enough capacity.
+            # A single full room/day must not abort the whole group.
+            for day in valid_days:
+                room_code = slot1 = slot2 = None
+                for rm in rooms:
+                    rc = rm[0]
+                    if need_two:
+                        for s1, s2 in time_blocks:
+                            if (_room_free(conn, rc, day, s1) and
+                                    _room_free(conn, rc, day, s2)):
+                                room_code, slot1, slot2 = rc, s1, s2
+                                break
+                    else:
+                        for s in single_slots:
+                            if _room_free(conn, rc, day, s):
+                                room_code, slot1 = rc, s
+                                break
+                    if slot1:
                         break
-            else:
-                for s in single_slots:
-                    if _room_free(conn, room_code, day, s):
-                        slot1 = s
-                        break
 
-            if not slot1:
-                continue
+                if not slot1:
+                    continue
 
-            # Write one schedule row per CC class code
-            for code in codes:
-                group = _extract_group(code)
-                conn.execute("""
-                    INSERT OR REPLACE INTO schedule
-                        (class_code, group_code, day, time1, time2, room_code)
-                    VALUES (?,?,?,?,?,?)
-                """, (code, group, day, slot1, slot2, room_code))
-                assigned += 1
+                # Write one schedule row per CC class code
+                for code in codes:
+                    group = _extract_group(code)
+                    conn.execute("""
+                        INSERT OR REPLACE INTO schedule
+                            (class_code, group_code, day, time1, time2, room_code)
+                        VALUES (?,?,?,?,?,?)
+                    """, (code, group, day, slot1, slot2, room_code))
+                    assigned += 1
 
-            scheduled = True
-            break
+                scheduled = True
+                break
+
+            if scheduled:
+                break
 
         if not scheduled:
             errors.append(f"{cc_group}: no valid day/centre found (L2 exhausted) — ERROR")
