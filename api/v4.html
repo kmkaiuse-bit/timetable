@@ -180,6 +180,10 @@
     .cell-lec[contenteditable] { cursor: text; border-radius: 3px; padding: 1px 3px; min-width: 30px; display: inline-block; }
     .cell-lec[contenteditable]:hover { background: rgba(255,255,255,.7); }
     .cell-lec[contenteditable]:focus { outline: 1px solid var(--accent); background: #fff; }
+    .wc-lec[contenteditable] { cursor: text; border-radius: 3px; padding: 0 2px; min-width: 22px; display: inline-block; }
+    .wc-lec[contenteditable]:hover { background: rgba(255,255,255,.75); }
+    .wc-lec[contenteditable]:focus { outline: 1px solid var(--accent); background: #fff; }
+    .wk-drop.drag-over { outline: 2px dashed var(--accent); background: #dcfce7 !important; }
     .edit-badge { display: none; background: #fbbf24; color: #78350f; border-radius: 12px; padding: 2px 10px; font-size: .7rem; font-weight: 700; margin-left: 10px; vertical-align: middle; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 10px 22px; border-radius: 8px; font-size: .84rem; z-index: 999; pointer-events: none; animation: fadeInOut 2.5s ease forwards; }
     @keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(8px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0} }
@@ -1025,12 +1029,61 @@
         if(e){
           const subj=(e.code||'').split('_')[0];
           const short=(e.code||'').includes('_')?e.code.split('_')[1]:e.code;
-          cells+=`<td class="week-cell slot-${subj}${sep}"><div class="wc-subj">${subj}</div><div class="wc-code">${short}</div><div class="wc-lec">${e.lec1||''}</div></td>`;
-        } else cells+=`<td class="${sep}"></td>`;
+          const eCls=state.editedCodes.has(e.code)?' edited':'';
+          cells+=`<td class="week-cell slot-${subj}${sep}${eCls} wk-drop" draggable="true" data-code="${e.code}" data-day="${d}" data-room="${room}" data-slot="${s}"><div class="wc-subj">${subj}</div><div class="wc-code">${short}</div><div class="wc-lec" contenteditable="true" spellcheck="false" data-code="${e.code}">${e.lec1||''}</div></td>`;
+        } else cells+=`<td class="wk-drop drop-target${sep}" data-day="${d}" data-room="${room}" data-slot="${s}"></td>`;
       }));
       return ch+`<tr><td class="room-lbl">${lbl}</td>${cells}</tr>`;
     }).join('');
     cont.innerHTML=`<table class="week-table"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table>`;
+    cont.querySelectorAll('td[draggable="true"]').forEach(td=>td.addEventListener('dragstart',onDragStart));
+    cont.querySelectorAll('.wk-drop').forEach(td=>{
+      td.addEventListener('dragover',e=>{e.preventDefault();td.classList.add('drag-over');});
+      td.addEventListener('dragleave',()=>td.classList.remove('drag-over'));
+      td.addEventListener('drop',onWeekDrop);
+    });
+    cont.querySelectorAll('.wc-lec[contenteditable]').forEach(el=>{
+      el.addEventListener('blur',onLecEdit);
+      el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();el.blur();}});
+    });
+  }
+
+  // Week-view cross-day move: relocate a class to another day/room/slot (or swap).
+  function onWeekDrop(e) {
+    e.preventDefault();
+    const td=e.currentTarget; td.classList.remove('drag-over');
+    if(!_dragCode)return;
+    const newDay=td.dataset.day,newRoom=td.dataset.room,newSlot=td.dataset.slot;
+    const dragEntry=state.results.find(r=>r.class_code===_dragCode);
+    if(!dragEntry){_dragCode=null;return;}
+    const occ=((_grid[newDay]||{})[newRoom]||{})[newSlot];
+    if(occ&&occ.code===_dragCode){_dragCode=null;return;}   // dropped on itself
+    const start=slotToRange(newSlot).start;
+    const is4h=getDurMins(dragEntry)>120;
+    const newTime1=minsToSlot(start,start+120);
+    const newTime2=is4h?minsToSlot(start+120,start+240):null;
+    if(occ){
+      const existEntry=state.results.find(r=>r.class_code===occ.code);
+      if(existEntry){
+        if(getDurMins(existEntry)!==getDurMins(dragEntry)){
+          showToast('⚠ 兩班時長不同，不能互換'); _dragCode=null; return;
+        }
+        const aDay=dragEntry.day,aRoom=dragEntry.room_code,aT1=dragEntry.time1,aT2=dragEntry.time2;
+        dragEntry.day=existEntry.day;dragEntry.room_code=existEntry.room_code;dragEntry.time1=existEntry.time1;dragEntry.time2=existEntry.time2;
+        existEntry.day=aDay;existEntry.room_code=aRoom;existEntry.time1=aT1;existEntry.time2=aT2;
+        state.editedCodes.add(_dragCode);state.editedCodes.add(occ.code);
+        showToast('↔ 互換：'+_dragCode.split('_')[1]+' ↔ '+occ.code.split('_')[1]);
+      }
+    }else{
+      if(is4h){
+        const occ2=((_grid[newDay]||{})[newRoom]||{})[newTime2];
+        if(occ2&&occ2.code!==_dragCode){ showToast('⚠ 下一格已有課，4 小時班放不下'); _dragCode=null; return; }
+      }
+      dragEntry.day=newDay;dragEntry.room_code=newRoom;dragEntry.time1=newTime1;dragEntry.time2=newTime2;
+      state.editedCodes.add(_dragCode);
+      showToast('→ 已搬：'+_dragCode.split('_')[1]+' 到 '+newDay.slice(0,3));
+    }
+    _dragCode=null; renderWeekOverview(); updateEditBadge();
   }
 
   // Month / semester calendar: 15 weeks × Mon-Fri per term, HK holidays marked.
