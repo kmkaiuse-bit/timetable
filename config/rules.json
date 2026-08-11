@@ -3,5 +3,8 @@
 
   "dae_days": ["Monday", "Tuesday", "Thursday"],
   "cadet_days": ["Monday", "Wednesday", "Friday"],
-  "teacher_weekly_cap": 6
+  "teacher_weekly_cap": 6,
+
+  "_capacity_tolerance_note": "容許課室座位比報名人數少最多幾多個（假設學期中會退修）。0 = 嚴格（必須坐得下全部報名人數）。",
+  "capacity_tolerance": 0
 }

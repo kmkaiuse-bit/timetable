@@ -169,6 +169,16 @@ _H8_MAX_TRAVEL_MIN = 90
 # H3 TS→TM exception: J1 assumption enabled (confirm with Jo — reverse by setting False)
 _TS_TM_ENABLED = True
 
+# Capacity tolerance: allow a room whose capacity is up to this many seats BELOW
+# the class's enrolled count, to account for expected student drop-out over the
+# term. 0 = strict (a room must fit the full enrolled count). Agent-tunable.
+_CAPACITY_TOLERANCE = 0
+
+
+def _required_capacity(student_count: int) -> int:
+    """Effective seats a room must have for this class (drop-out tolerance applied)."""
+    return max(0, (student_count or 0) - _CAPACITY_TOLERANCE)
+
 
 def load_rules_config(path: str = None) -> dict:
     """
@@ -181,6 +191,7 @@ def load_rules_config(path: str = None) -> dict:
     """
     import json
     global _DAY_PRIORITY, _CADET_DAY_PRIORITY, _CADET_DAYS, _TEACHER_WEEKLY_SESSION_CAP
+    global _CAPACITY_TOLERANCE
 
     if path is None:
         # repo_root/config/rules.json  (this file lives in repo_root/api/)
@@ -209,6 +220,11 @@ def load_rules_config(path: str = None) -> dict:
     if isinstance(cap, int) and cap > 0:
         _TEACHER_WEEKLY_SESSION_CAP = cap
         applied["teacher_weekly_cap"] = cap
+
+    tol = cfg.get("capacity_tolerance")
+    if isinstance(tol, int) and tol >= 0:
+        _CAPACITY_TOLERANCE = tol
+        applied["capacity_tolerance"] = tol
 
     return applied
 
@@ -706,7 +722,7 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
             # otherwise fall through to a capacity-aware room search.
             row = conn.execute(
                 "SELECT code FROM rooms WHERE code = ? AND capacity >= ?",
-                (candidate, student_count)).fetchone()
+                (candidate, _required_capacity(student_count))).fetchone()
             if row:
                 return row[0], centre
 
@@ -716,7 +732,7 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
             ORDER BY capacity ASC LIMIT 1
-        """, (allowed_centre, student_count)).fetchone()
+        """, (allowed_centre, _required_capacity(student_count))).fetchone()
         if row:
             return row[0], allowed_centre
 
@@ -727,7 +743,7 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
             ORDER BY capacity ASC LIMIT 1
-        """, (fb_centre, student_count)).fetchone()
+        """, (fb_centre, _required_capacity(student_count))).fetchone()
         if fb_centre not in allowed and row:
             return row[0], fb_centre
 
@@ -1117,7 +1133,7 @@ def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
                 SELECT code FROM rooms
                 WHERE centre = ? AND capacity >= ?
                 ORDER BY capacity ASC
-            """, (centre, total_students)).fetchall()
+            """, (centre, _required_capacity(total_students))).fetchall()
             if not rooms:
                 continue
 
@@ -2105,7 +2121,7 @@ def phase0_schedule_cadets(conn: sqlite3.Connection) -> tuple:
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
             ORDER BY capacity ASC LIMIT 1
-        """, (centre, cls["student_count"] or 0)).fetchone()
+        """, (centre, _required_capacity(cls["student_count"] or 0))).fetchone()
         if not room:
             errors.append(f"{cls['code']}: no room at {centre} with capacity >= {cls['student_count']}")
             continue
