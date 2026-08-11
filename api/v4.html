@@ -171,6 +171,8 @@
     /* Cross-centre highlight */
     td.cross-centre { border-left: 4px solid #f59e0b !important; background-color: rgba(251,191,36,.08) !important; }
     .cell-cross { display: inline-block; font-size: .60rem; font-weight: 700; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 3px; padding: 0 4px; margin-top: 2px; white-space: nowrap; }
+    .cell-combine, .wc-combine { display: inline-block; font-size: .58rem; font-weight: 700; color: #5b21b6; background: #ede9fe; border: 1px solid #ddd6fe; border-radius: 3px; padding: 0 4px; margin-left: 4px; white-space: nowrap; vertical-align: middle; }
+    td.combined { outline: 1.5px solid #c4b5fd; outline-offset: -1.5px; }
     td[draggable="true"] { cursor: grab; transition: box-shadow .12s, transform .12s; }
     td[draggable="true"]:hover { box-shadow: 0 3px 10px rgba(0,0,0,.13); transform: translateY(-1px); position: relative; z-index: 1; }
     td[draggable="true"]:active { cursor: grabbing; }
@@ -1028,9 +1030,11 @@
         const e=((_grid[d]||{})[room]||{})[s];
         if(e){
           const subj=(e.code||'').split('_')[0];
-          const short=(e.code||'').includes('_')?e.code.split('_')[1]:e.code;
+          const cmb=e.combined&&e.members;
+          const short=cmb?e.members.map(m=>m.group).join('+'):((e.code||'').includes('_')?e.code.split('_')[1]:e.code);
+          const cmbBadge=cmb?'<span class="wc-combine">合併</span>':'';
           const eCls=state.editedCodes.has(e.code)?' edited':'';
-          cells+=`<td class="week-cell slot-${subj}${sep}${eCls} wk-drop" draggable="true" data-code="${e.code}" data-day="${d}" data-room="${room}" data-slot="${s}"><div class="wc-subj">${subj}</div><div class="wc-code">${short}</div><div class="wc-lec" contenteditable="true" spellcheck="false" data-code="${e.code}">${e.lec1||''}</div></td>`;
+          cells+=`<td class="week-cell slot-${subj}${sep}${eCls}${cmb?' combined':''} wk-drop" draggable="true" data-code="${e.code}" data-day="${d}" data-room="${room}" data-slot="${s}"><div class="wc-subj">${subj}</div><div class="wc-code">${short}${cmbBadge}</div><div class="wc-lec" contenteditable="true" spellcheck="false" data-code="${e.code}">${e.lec1||''}</div></td>`;
         } else cells+=`<td class="wk-drop drop-target${sep}" data-day="${d}" data-room="${room}" data-slot="${s}"></td>`;
       }));
       return ch+`<tr><td class="room-lbl">${lbl}</td>${cells}</tr>`;
@@ -1121,10 +1125,20 @@
     _grid={};
     state.results.forEach(r=>{
       if(!r.day||!r.room_code)return;
+      const grp=(r.class_code||'').includes('_')?r.class_code.split('_').slice(1).join('_'):r.class_code;
       _grid[r.day]=_grid[r.day]||{};
       _grid[r.day][r.room_code]=_grid[r.day][r.room_code]||{};
       [r.time1,r.time2].filter(Boolean).forEach(slot=>{
-        _grid[r.day][r.room_code][slot]={code:r.class_code,subject_cn:r.name_cn,subject_en:r.name_en,lec1:r.lec1||'',students:r.student_count||0};
+        const cell=_grid[r.day][r.room_code][slot];
+        if(cell){
+          // same room+slot already occupied → this is a CC-combined session
+          cell.combined=true;
+          cell.members.push({code:r.class_code,group:grp,lec1:r.lec1||''});
+          cell.students+=r.student_count||0;
+          cell.cc_group=cell.cc_group||r.cc_group||'';
+        } else {
+          _grid[r.day][r.room_code][slot]={code:r.class_code,subject_cn:r.name_cn,subject_en:r.name_en,lec1:r.lec1||'',students:r.student_count||0,cc_group:r.cc_group||'',combined:false,members:[{code:r.class_code,group:grp,lec1:r.lec1||''}]};
+        }
       });
     });
   }
@@ -1159,14 +1173,17 @@
           const span=(blk.end-blk.start)/GRID_STEP;
           const subj=(blk.entry.code||'').split('_')[0];
           const grp=(blk.entry.code||'').includes('_')?blk.entry.code.split('_').slice(1).join('_'):'';
+          const cmb=blk.entry.combined&&blk.entry.members;
+          const groups=cmb?blk.entry.members.map(m=>m.group).join(' + '):grp;
+          const cmbBadge=cmb?'<span class="cell-combine">合併</span>':'';
           const eCls=state.editedCodes.has(blk.entry.code)?' edited':'';
           const cc=state.crossCentreMap[blk.entry.code];
           const ccCls=cc?' cross-centre':'';
           const ccBadge=cc?`<div class="cell-cross">⇄ ${cc.from}→${cc.to}</div>`:'';
-          cells+=`<td colspan="${span}" class="slot-${subj}${eCls}${ccCls}" draggable="true"
+          cells+=`<td colspan="${span}" class="slot-${subj}${eCls}${ccCls}${cmb?' combined':''}" draggable="true"
               data-code="${blk.entry.code}" data-day="${day}" data-room="${room}"
               data-start="${blk.start}" data-end="${blk.end}">
-            <div class="cell-code"><span class="cell-subjcode">${subj}</span>${grp?`<span class="cell-grp">${grp}</span>`:''}</div>
+            <div class="cell-code"><span class="cell-subjcode">${subj}</span>${groups?`<span class="cell-grp">${groups}</span>`:''}${cmbBadge}</div>
             <div class="cell-time">${minsToLabel(blk.start)}–${minsToLabel(blk.end)}</div>
             <div class="cell-subj">${blk.entry.subject_cn||''}</div>
             <div class="cell-lec" contenteditable="true" spellcheck="false" data-code="${blk.entry.code}">${blk.entry.lec1||''}</div>

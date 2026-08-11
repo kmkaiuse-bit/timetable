@@ -1634,6 +1634,7 @@ def collect_results(conn: sqlite3.Connection) -> list:
             s.class_code, s.day, s.time1, s.time2, s.room_code,
             t1.name AS lec1, t2.name AS lec2, t3.name AS lec3,
             c.student_count,
+            c.cc_group,
             sub.name_cn,
             sub.name_en,
             sub.loading_hrs
