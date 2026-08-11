@@ -28,7 +28,7 @@
 ```
 同事本機
   ├─ 項目資料夾（引擎 + 他們的 Excel）        ← 由負責人派發
-  ├─ 本機 AI agent（如 Claude Code）
+  ├─ 本機 AI agent（work buddy）
   ├─ config/rules.json      ← 規則的文字檔（agent 改；git 可讀差異）
   ├─ 本機 git 歷史          ← agent 每次更改自動 commit（同事無感）
   └─ CHANGELOG（白話）      ← agent 累積，供人閱讀

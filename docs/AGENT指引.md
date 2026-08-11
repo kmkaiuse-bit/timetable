@@ -1,6 +1,6 @@
 # AI Agent 操作指引（排班優化）
 
-> 這份是給**本機 AI agent**（例如 Claude Code）閱讀的操作守則。
+> 這份是給**本機 AI agent（work buddy）**閱讀的操作守則。
 > 同事把這份連同項目資料夾交給 agent，agent 依此協助排班優化。
 
 ## 你的角色
