@@ -659,8 +659,11 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
         num = num_match.group()
         for candidate in (f"{centre} - {centre}{num}",
                           f"{centre} - C{num}"):   # CSW - C1 style
+            # Only use the group's home room if it actually fits the class;
+            # otherwise fall through to a capacity-aware room search.
             row = conn.execute(
-                "SELECT code FROM rooms WHERE code = ?", (candidate,)).fetchone()
+                "SELECT code FROM rooms WHERE code = ? AND capacity >= ?",
+                (candidate, student_count)).fetchone()
             if row:
                 return row[0], centre
 
@@ -669,7 +672,7 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
         row = conn.execute("""
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
-            ORDER BY capacity DESC LIMIT 1
+            ORDER BY capacity ASC LIMIT 1
         """, (allowed_centre, student_count)).fetchone()
         if row:
             return row[0], allowed_centre
@@ -680,7 +683,7 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
         row = conn.execute("""
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
-            ORDER BY capacity DESC LIMIT 1
+            ORDER BY capacity ASC LIMIT 1
         """, (fb_centre, student_count)).fetchone()
         if fb_centre not in allowed and row:
             return row[0], fb_centre
