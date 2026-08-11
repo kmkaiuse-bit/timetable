@@ -6,22 +6,22 @@
 
 ## Prompt 1 — 跑一次排班並產生結果檔
 
-> 使用前：把你的 Excel 放進 `data/` 資料夾，並把下面的 `<你的檔名>` 換成實際檔名。
-> 想先試，可直接用內附的 `data/demo_start.xlsx`。
+> 使用前：把你的 Excel 放進 `data/輸入/` 資料夾，並把下面的 `<你的檔名>` 換成實際檔名。
+> 想先試，可直接用內附的 `data/輸入/demo_start.xlsx`。
 
 ```
 你是我們的排班助手。這個資料夾是排班系統的工具包。請用中文，照以下步驟做：
 
 1. 先閱讀 `使用說明.md` 和 `docs/AGENT指引.md`，用一兩句話告訴我你的角色，以及你可以改什麼、不可以改什麼。
 
-2. 我已經把我的 Excel 放進 data/ 資料夾。請跑完整排班並產生結果檔，執行：
-   python scripts/schedule.py "data/<你的檔名>.xlsx"
-   這會產生一個「<你的檔名>_排班結果.xlsx」，排好的時間表在「Class Assignments」分頁。
+2. 我已經把我的 Excel 放進 data/輸入/ 資料夾。請跑完整排班並產生結果檔，執行：
+   python scripts/schedule.py "data/輸入/<你的檔名>.xlsx"
+   結果檔會存到 data/輸出/ 資料夾，排好的時間表在「Class Assignments」分頁。
 
 3. 再執行以下指令，給我排到／排不到的詳細數字：
-   python scripts/verify.py "data/<你的檔名>.xlsx"
+   python scripts/verify.py "data/輸入/<你的檔名>.xlsx"
 
-4. 清楚報告：排到多少、排不到多少、有沒有超額（應為 0）、哪些中心最緊張，以及結果檔的位置。
+4. 清楚報告：排到多少、排不到多少、有沒有超額（應為 0）、哪些中心最緊張，以及結果檔在 data/輸出/ 的位置。
 
 5. 如果幾乎全部排不到，很可能是「Class list answer」分頁有殘留資料（要留空系統才會自動排）。請檢查並提醒我。
 
