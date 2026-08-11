@@ -169,6 +169,49 @@ _H8_MAX_TRAVEL_MIN = 90
 # H3 TS→TM exception: J1 assumption enabled (confirm with Jo — reverse by setting False)
 _TS_TM_ENABLED = True
 
+
+def load_rules_config(path: str = None) -> dict:
+    """
+    Load editable scheduling rules from config/rules.json and override the
+    matching module constants. This is the single text surface an AI agent edits
+    on behalf of the scheduling staff; each change is a readable one-line diff.
+
+    Missing file / missing key / bad value → keep the engine default (no change),
+    so behaviour is identical when the file is absent. Returns the applied dict.
+    """
+    import json
+    global _DAY_PRIORITY, _CADET_DAY_PRIORITY, _CADET_DAYS, _TEACHER_WEEKLY_SESSION_CAP
+
+    if path is None:
+        # repo_root/config/rules.json  (this file lives in repo_root/api/)
+        path = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "config", "rules.json")
+
+    applied: dict = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        return applied  # no file or unreadable → defaults stand
+
+    days = cfg.get("dae_days")
+    if isinstance(days, list) and days:
+        _DAY_PRIORITY = list(days)
+        applied["dae_days"] = _DAY_PRIORITY
+
+    cadet = cfg.get("cadet_days")
+    if isinstance(cadet, list) and cadet:
+        _CADET_DAY_PRIORITY = list(cadet)
+        _CADET_DAYS = set(cadet)
+        applied["cadet_days"] = _CADET_DAY_PRIORITY
+
+    cap = cfg.get("teacher_weekly_cap")
+    if isinstance(cap, int) and cap > 0:
+        _TEACHER_WEEKLY_SESSION_CAP = cap
+        applied["teacher_weekly_cap"] = cap
+
+    return applied
+
 # Issue diagnostics: suggested actions per reason code (used by Issues panel + Excel sheet)
 _SUGGESTED_ACTIONS = {
     "NO_ROOM_CAPACITY": "Increase room capacity at this centre or split the class into smaller groups",
@@ -2118,6 +2161,9 @@ def run_v4_from_bytes(excel_bytes: bytes, term_dates: dict = None) -> tuple:
     """
     import gc
     from io import BytesIO
+
+    # Apply any editable rules from config/rules.json (no file → defaults).
+    load_rules_config()
 
     wb_read = openpyxl.load_workbook(
         BytesIO(excel_bytes), data_only=True, read_only=True)

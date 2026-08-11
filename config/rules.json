@@ -1,0 +1,7 @@
+{
+  "_comment": "排班規則設定（文字檔，方便逐項記錄與檢視差異）。AI agent 按同事要求修改這裡；引擎啟動時讀取。刪除或留空某項 = 用引擎預設值。",
+
+  "dae_days": ["Monday", "Tuesday", "Thursday"],
+  "cadet_days": ["Monday", "Wednesday", "Friday"],
+  "teacher_weekly_cap": 6
+}
