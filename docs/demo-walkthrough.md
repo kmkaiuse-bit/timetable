@@ -11,6 +11,19 @@ python scripts/verify.py "data/demo/demo_start.xlsx"
 
 ---
 
+## 用 work buddy 示範的兩個 prompt
+
+貼給 work buddy 用的完整 prompt 收錄在 `docs/示範prompt.md`（同事包內亦有一份）。兩個 prompt：
+
+- **Prompt 1 — 跑一次排班**：work buddy 讀說明 → 執行 `python scripts/verify.py "data/<你的檔名>.xlsx"` → 報告排到／排不到／超額／各中心。用來 **show 系統會排班**。
+- **Prompt 2 — 規則導覽**：work buddy 讀規則文件 → 用白話把「所有規則 + 排法」解釋給用家 → 引導用家提出更改。用來 **讓用家先明白背景，再寫改**。
+
+**建議次序：** 先 Prompt 2（明白背景）→ 再 Prompt 1（看實際結果）→ 之後用日常說話請 work buddy 調整。
+
+> 完整可複製的 prompt 內容見 `docs/示範prompt.md`。
+
+---
+
 ## 第 1 幕：現況（跑數）
 
 **做：**
