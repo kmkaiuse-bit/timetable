@@ -23,10 +23,13 @@
 
 1. **理解需求** —— 用同事的說話確認要改什麼。
 2. **做更改** —— 改 `config/rules.json` 或 Excel（只改必要的部分）。
-3. **跑數** —— 執行：
+3. **跑數 / 產生結果** —— 執行：
    ```
-   python scripts/verify.py "<使用者的.xlsx>"
+   python scripts/verify.py "<使用者的.xlsx>"      # 只報數字（排到／排不到／各中心）
+   python scripts/schedule.py "<使用者的.xlsx>"    # 產生填好的排班結果 Excel
    ```
+   `schedule.py` 會產生 `<檔名>_排班結果.xlsx`，排好的時間表在「Class Assignments」分頁。
+   （結果寫在**另一個輸出檔**，不是輸入檔的「Class list answer」——輸入那頁要保持留空。）
 4. **回報** —— 把結果告訴同事：**排到 / 排不到（與上次比較）、超額（應為 0）、各中心緊張程度**。
    **永不只講「改好了」而不給數據。**
 5. **記錄** —— 同事認可後，git commit（訊息用白話 + 影響數據），例如：
