@@ -116,8 +116,12 @@ _MARKER_TO_SLOT = {
 # but all TKO rooms are stored as centre 'TKO'.
 _GROUP_CENTRE_ALIAS = {"CS": "CSW", "TK": "TKO"}
 
-# Day preference order: Mon > Tue > Thu > Wed > Fri
-_DAY_PRIORITY = ["Monday", "Tuesday", "Thursday", "Wednesday", "Friday"]
+# Day preference order for DAE subjects: Mon > Tue > Thu ONLY.
+# DAE classes are NOT scheduled on Wednesday or Friday (2026-08 requirement).
+# NOTE: Cadet classes are the explicit exception — they keep Mon/Wed/Fri and use
+# _CADET_DAY_PRIORITY (see Phase 0 / phase0_schedule_cadets). Do not add Wed/Fri
+# back here, and do not use _DAY_PRIORITY.index() on cadet days (would ValueError).
+_DAY_PRIORITY = ["Monday", "Tuesday", "Thursday"]
 
 # 4-hour blocks (two consecutive 2h slots on the same day).
 # Only non-overlapping blocks — the double-booking LIKE check would miss
@@ -164,6 +168,65 @@ _H8_MAX_TRAVEL_MIN = 90
 
 # H3 TS→TM exception: J1 assumption enabled (confirm with Jo — reverse by setting False)
 _TS_TM_ENABLED = True
+
+# Capacity tolerance: allow a room whose capacity is up to this many seats BELOW
+# the class's enrolled count, to account for expected student drop-out over the
+# term. 0 = strict (a room must fit the full enrolled count). Agent-tunable.
+_CAPACITY_TOLERANCE = 0
+
+
+def _required_capacity(student_count: int) -> int:
+    """Effective seats a room must have for this class (drop-out tolerance applied)."""
+    return max(0, (student_count or 0) - _CAPACITY_TOLERANCE)
+
+
+def load_rules_config(path: str = None) -> dict:
+    """
+    Load editable scheduling rules from config/rules.json and override the
+    matching module constants. This is the single text surface an AI agent edits
+    on behalf of the scheduling staff; each change is a readable one-line diff.
+
+    Missing file / missing key / bad value → keep the engine default (no change),
+    so behaviour is identical when the file is absent. Returns the applied dict.
+    """
+    import json
+    global _DAY_PRIORITY, _CADET_DAY_PRIORITY, _CADET_DAYS, _TEACHER_WEEKLY_SESSION_CAP
+    global _CAPACITY_TOLERANCE
+
+    if path is None:
+        # repo_root/config/rules.json  (this file lives in repo_root/api/)
+        path = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "config", "rules.json")
+
+    applied: dict = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        return applied  # no file or unreadable → defaults stand
+
+    days = cfg.get("dae_days")
+    if isinstance(days, list) and days:
+        _DAY_PRIORITY = list(days)
+        applied["dae_days"] = _DAY_PRIORITY
+
+    cadet = cfg.get("cadet_days")
+    if isinstance(cadet, list) and cadet:
+        _CADET_DAY_PRIORITY = list(cadet)
+        _CADET_DAYS = set(cadet)
+        applied["cadet_days"] = _CADET_DAY_PRIORITY
+
+    cap = cfg.get("teacher_weekly_cap")
+    if isinstance(cap, int) and cap > 0:
+        _TEACHER_WEEKLY_SESSION_CAP = cap
+        applied["teacher_weekly_cap"] = cap
+
+    tol = cfg.get("capacity_tolerance")
+    if isinstance(tol, int) and tol >= 0:
+        _CAPACITY_TOLERANCE = tol
+        applied["capacity_tolerance"] = tol
+
+    return applied
 
 # Issue diagnostics: suggested actions per reason code (used by Issues panel + Excel sheet)
 _SUGGESTED_ACTIONS = {
@@ -655,8 +718,11 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
         num = num_match.group()
         for candidate in (f"{centre} - {centre}{num}",
                           f"{centre} - C{num}"):   # CSW - C1 style
+            # Only use the group's home room if it actually fits the class;
+            # otherwise fall through to a capacity-aware room search.
             row = conn.execute(
-                "SELECT code FROM rooms WHERE code = ?", (candidate,)).fetchone()
+                "SELECT code FROM rooms WHERE code = ? AND capacity >= ?",
+                (candidate, _required_capacity(student_count))).fetchone()
             if row:
                 return row[0], centre
 
@@ -665,8 +731,8 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
         row = conn.execute("""
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
-            ORDER BY capacity DESC LIMIT 1
-        """, (allowed_centre, student_count)).fetchone()
+            ORDER BY capacity ASC LIMIT 1
+        """, (allowed_centre, _required_capacity(student_count))).fetchone()
         if row:
             return row[0], allowed_centre
 
@@ -676,8 +742,8 @@ def _pick_room(conn: sqlite3.Connection, group_code: str, student_count: int) ->
         row = conn.execute("""
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
-            ORDER BY capacity DESC LIMIT 1
-        """, (fb_centre, student_count)).fetchone()
+            ORDER BY capacity ASC LIMIT 1
+        """, (fb_centre, _required_capacity(student_count))).fetchone()
         if fb_centre not in allowed and row:
             return row[0], fb_centre
 
@@ -961,12 +1027,15 @@ def _select_cc_centre(conn: sqlite3.Connection, class_codes: list) -> list:
                   key=lambda c: (-centre_students[c], -_CENTRE_RANK.get(c, 0)))
 
 
-def _find_cc_day(conn: sqlite3.Connection, class_codes: list,
-                 centre: str) -> Optional[str]:
+def _find_cc_days(conn: sqlite3.Connection, class_codes: list,
+                  centre: str) -> list:
     """
-    L1: Find a day where NONE of the CC group's students already have a Core
-    class at a different centre.  Returns the first valid day or None.
+    L1: Return ALL days (in priority order) where NONE of the CC group's
+    students already have a Core class at a different centre. Returning every
+    valid day lets the caller try the next one when a day's rooms are full,
+    instead of aborting the whole group on the first candidate.
     """
+    valid = []
     for day in _DAY_PRIORITY:
         conflict = False
         for code in class_codes:
@@ -984,8 +1053,8 @@ def _find_cc_day(conn: sqlite3.Connection, class_codes: list,
                 conflict = True
                 break
         if not conflict:
-            return day
-    return None
+            valid.append(day)
+    return valid
 
 
 def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
@@ -1050,8 +1119,8 @@ def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
         scheduled    = False
 
         for centre in centre_order:
-            day = _find_cc_day(conn, codes, centre)
-            if not day:
+            valid_days = _find_cc_days(conn, codes, centre)
+            if not valid_days:
                 continue
 
             # Find a suitable room at this centre
@@ -1060,15 +1129,14 @@ def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
                               (c,)).fetchone() or [0])[0]
                 for c in codes
             )
-            room = conn.execute("""
+            rooms = conn.execute("""
                 SELECT code FROM rooms
                 WHERE centre = ? AND capacity >= ?
-                ORDER BY capacity ASC LIMIT 1
-            """, (centre, total_students)).fetchone()
-            if not room:
+                ORDER BY capacity ASC
+            """, (centre, _required_capacity(total_students))).fetchall()
+            if not rooms:
                 continue
 
-            room_code = room[0]
             loading   = conn.execute(
                 "SELECT loading_hrs FROM subjects WHERE code=?",
                 (subj,)).fetchone()
@@ -1077,35 +1145,44 @@ def cc_assign_schedule(conn: sqlite3.Connection) -> tuple:
             time_blocks = _TKO_TIME_BLOCKS if centre == "TKO" else _TIME_BLOCKS
             single_slots = _TKO_SINGLE_SLOTS if centre == "TKO" else _SINGLE_SLOTS
 
-            # Find a free slot on that day
-            slot1 = slot2 = None
-            if need_two:
-                for s1, s2 in time_blocks:
-                    if (_room_free(conn, room_code, day, s1) and
-                            _room_free(conn, room_code, day, s2)):
-                        slot1, slot2 = s1, s2
+            # Try each valid day; within a day try every room with enough capacity.
+            # A single full room/day must not abort the whole group.
+            for day in valid_days:
+                room_code = slot1 = slot2 = None
+                for rm in rooms:
+                    rc = rm[0]
+                    if need_two:
+                        for s1, s2 in time_blocks:
+                            if (_room_free(conn, rc, day, s1) and
+                                    _room_free(conn, rc, day, s2)):
+                                room_code, slot1, slot2 = rc, s1, s2
+                                break
+                    else:
+                        for s in single_slots:
+                            if _room_free(conn, rc, day, s):
+                                room_code, slot1 = rc, s
+                                break
+                    if slot1:
                         break
-            else:
-                for s in single_slots:
-                    if _room_free(conn, room_code, day, s):
-                        slot1 = s
-                        break
 
-            if not slot1:
-                continue
+                if not slot1:
+                    continue
 
-            # Write one schedule row per CC class code
-            for code in codes:
-                group = _extract_group(code)
-                conn.execute("""
-                    INSERT OR REPLACE INTO schedule
-                        (class_code, group_code, day, time1, time2, room_code)
-                    VALUES (?,?,?,?,?,?)
-                """, (code, group, day, slot1, slot2, room_code))
-                assigned += 1
+                # Write one schedule row per CC class code
+                for code in codes:
+                    group = _extract_group(code)
+                    conn.execute("""
+                        INSERT OR REPLACE INTO schedule
+                            (class_code, group_code, day, time1, time2, room_code)
+                        VALUES (?,?,?,?,?,?)
+                    """, (code, group, day, slot1, slot2, room_code))
+                    assigned += 1
 
-            scheduled = True
-            break
+                scheduled = True
+                break
+
+            if scheduled:
+                break
 
         if not scheduled:
             errors.append(f"{cc_group}: no valid day/centre found (L2 exhausted) — ERROR")
@@ -1630,6 +1707,7 @@ def collect_results(conn: sqlite3.Connection) -> list:
             s.class_code, s.day, s.time1, s.time2, s.room_code,
             t1.name AS lec1, t2.name AS lec2, t3.name AS lec3,
             c.student_count,
+            c.cc_group,
             sub.name_cn,
             sub.name_en,
             sub.loading_hrs
@@ -1996,6 +2074,10 @@ def run_from_bytes(excel_bytes: bytes) -> tuple:
 
 
 _CADET_DAYS = {"Monday", "Wednesday", "Friday"}
+# Cadet day preference order (Mon > Wed > Fri). Kept separate from _DAY_PRIORITY
+# so that restricting DAE subjects to Mon/Tue/Thu does not affect cadet placement,
+# and so nothing calls _DAY_PRIORITY.index() on Wed/Fri (which are no longer in it).
+_CADET_DAY_PRIORITY = ["Monday", "Wednesday", "Friday"]
 
 
 def _is_cadet_class(class_code: str) -> bool:
@@ -2039,7 +2121,7 @@ def phase0_schedule_cadets(conn: sqlite3.Connection) -> tuple:
             SELECT code FROM rooms
             WHERE centre = ? AND capacity >= ?
             ORDER BY capacity ASC LIMIT 1
-        """, (centre, cls["student_count"] or 0)).fetchone()
+        """, (centre, _required_capacity(cls["student_count"] or 0))).fetchone()
         if not room:
             errors.append(f"{cls['code']}: no room at {centre} with capacity >= {cls['student_count']}")
             continue
@@ -2054,7 +2136,7 @@ def phase0_schedule_cadets(conn: sqlite3.Connection) -> tuple:
         single_slots = _TKO_SINGLE_SLOTS if centre == "TKO" else _SINGLE_SLOTS
 
         assigned = False
-        for day in sorted(_CADET_DAYS, key=lambda d: _DAY_PRIORITY.index(d)):
+        for day in _CADET_DAY_PRIORITY:
             if need_two:
                 for s1, s2 in time_blocks:
                     if _room_free(conn, room[0], day, s1) and _room_free(conn, room[0], day, s2):
@@ -2095,6 +2177,9 @@ def run_v4_from_bytes(excel_bytes: bytes, term_dates: dict = None) -> tuple:
     """
     import gc
     from io import BytesIO
+
+    # Apply any editable rules from config/rules.json (no file → defaults).
+    load_rules_config()
 
     wb_read = openpyxl.load_workbook(
         BytesIO(excel_bytes), data_only=True, read_only=True)

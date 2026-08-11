@@ -29,7 +29,7 @@
     .header { background: var(--accent); color: #fff; padding: 20px 40px; }
     .header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em; }
     .header p  { font-size: .81rem; opacity: .6; margin-top: 4px; }
-    .container { max-width: 980px; margin: 30px auto; padding: 0 20px 60px; }
+    .container { max-width: 100%; margin: 30px auto; padding: 0 32px 60px; }
     .card { background: var(--card); border-radius: var(--r); padding: 26px 30px; box-shadow: var(--shadow); border: 1px solid var(--border-s); margin-bottom: 16px; }
     .info-panel { border-left: 3px solid var(--accent); background: var(--accent-lt); padding: 15px 22px; border-radius: 0 var(--r-sm) var(--r-sm) 0; margin-bottom: 16px; }
     .drop-zone { border: 1.5px dashed var(--accent-bd); border-radius: var(--r-sm); padding: 34px 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; user-select: none; }
@@ -119,13 +119,14 @@
     .view-btn.active { background: var(--accent); color: #fff; }
     .view-btn:hover:not(.active) { background: var(--border); color: var(--text); }
     /* Week overview: room × (day × slot) */
-    .week-table { border-collapse: collapse; font-size: .68rem; }
-    .week-table th, .week-table td { border: 1px solid var(--border); padding: 3px 5px; text-align: center; white-space: nowrap; }
+    .week-table { border-collapse: collapse; font-size: .9rem; }
+    .week-table th, .week-table td { border: 1px solid var(--border); padding: 9px 12px; text-align: center; white-space: nowrap; }
     .week-table thead th { background: var(--accent); color: #fff; font-weight: 600; position: sticky; top: 0; }
     .week-table th.day-sep, .week-table td.day-sep { border-left: 2px solid #94a3b8; }
     .week-table td.room-lbl { white-space: nowrap; font-weight: 600; color: #374151; text-align: left; background: #f8fafc; position: sticky; left: 0; }
     .week-table tr.centre-row td { background: #f1f5f9; font-weight: 700; color: #475569; text-align: left; font-size: .7rem; }
-    .week-cell { line-height: 1.25; }
+    .week-cell { line-height: 1.35; }
+    .week-cell .wc-subj { font-weight: 800; color: #0f172a; font-size: .88rem; letter-spacing: .02em; }
     .week-cell .wc-code { font-weight: 700; }
     .week-cell .wc-lec { color: #6b7280; }
     .week-cell.conflict { background: #fee2e2 !important; outline: 2px solid #dc2626; outline-offset: -2px; }
@@ -134,8 +135,8 @@
     .cal-wrap { display: flex; flex-wrap: wrap; gap: 24px; }
     .cal-term { flex: 1 1 340px; }
     .cal-term h4 { margin: 0 0 8px; font-size: .9rem; color: var(--text); }
-    .cal-table { border-collapse: collapse; font-size: .72rem; width: 100%; }
-    .cal-table th, .cal-table td { border: 1px solid var(--border); padding: 5px 4px; text-align: center; }
+    .cal-table { border-collapse: collapse; font-size: .92rem; width: 100%; }
+    .cal-table th, .cal-table td { border: 1px solid var(--border); padding: 11px 9px; text-align: center; }
     .cal-table thead th { background: var(--accent); color: #fff; font-weight: 600; }
     .cal-table td.wk-lbl { background: #f8fafc; font-weight: 600; color: #64748b; white-space: nowrap; }
     .cal-table td.holiday { background: #fee2e2; color: #b91c1c; font-weight: 600; }
@@ -148,18 +149,20 @@
     .day-tab.active { color: var(--accent); }
     .day-tab.active::after { transform: scaleX(1); }
     .day-tab:hover:not(.active) { color: var(--text); }
-    .tt-table { border-collapse: collapse; font-size: .78rem; min-width: 600px; }
-    .tt-table th { background: var(--accent); color: #fff; padding: 7px 10px; text-align: center; white-space: nowrap; font-weight: 600; }
-    .tt-table th:first-child { text-align: left; background: #14532d; width: 110px; }
-    .tt-table td { border: 1px solid var(--border); padding: 5px 8px; vertical-align: top; min-height: 54px; }
+    .tt-table { border-collapse: collapse; font-size: .98rem; min-width: 760px; }
+    .tt-table th { background: var(--accent); color: #fff; padding: 11px 14px; text-align: center; white-space: nowrap; font-weight: 600; }
+    .tt-table th:first-child { text-align: left; background: #14532d; width: 158px; }
+    .tt-table td { border: 1px solid var(--border); padding: 11px 14px; vertical-align: top; height: 92px; }
     .tt-table tr:nth-child(odd)  td:first-child { background: var(--border-s); }
     .tt-table tr:nth-child(even) td:first-child { background: #edf2f7; }
     .tt-table td:first-child { font-weight: 600; color: #374151; white-space: nowrap; font-size: .75rem; }
-    .cell-code { font-weight: 700; font-size: .78rem; color: var(--text); }
-    .cell-time { font-size: .62rem; color: var(--dim); margin-top: 1px; letter-spacing: .01em; }
-    .cell-subj { font-size: .71rem; color: #475569; margin-top: 2px; }
-    .cell-lec  { font-size: .69rem; color: var(--muted); margin-top: 3px; }
-    .cell-stu  { font-size: .64rem; color: var(--dim); margin-top: 1px; }
+    .cell-code { font-weight: 700; font-size: 1.02rem; color: var(--text); display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+    .cell-subjcode { font-weight: 800; font-size: .98rem; color: #0f172a; letter-spacing: .02em; }
+    .cell-grp { font-weight: 600; font-size: .88rem; color: var(--muted); }
+    .cell-time { font-size: .78rem; color: var(--dim); margin-top: 3px; letter-spacing: .01em; }
+    .cell-subj { font-size: .88rem; color: #475569; margin-top: 4px; }
+    .cell-lec  { font-size: .86rem; color: var(--muted); margin-top: 5px; }
+    .cell-stu  { font-size: .78rem; color: var(--dim); margin-top: 3px; }
     .slot-DAE101 { border-left: 5px solid #3b82f6; background: #f0f6ff; }
     .slot-DAE102 { border-left: 5px solid #10b981; background: #f0fdf8; }
     .slot-DAE103 { border-left: 5px solid #f59e0b; background: #fffcf0; }
@@ -168,6 +171,8 @@
     /* Cross-centre highlight */
     td.cross-centre { border-left: 4px solid #f59e0b !important; background-color: rgba(251,191,36,.08) !important; }
     .cell-cross { display: inline-block; font-size: .60rem; font-weight: 700; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 3px; padding: 0 4px; margin-top: 2px; white-space: nowrap; }
+    .cell-combine, .wc-combine { display: inline-block; font-size: .58rem; font-weight: 700; color: #5b21b6; background: #ede9fe; border: 1px solid #ddd6fe; border-radius: 3px; padding: 0 4px; margin-left: 4px; white-space: nowrap; vertical-align: middle; }
+    td.combined { outline: 1.5px solid #c4b5fd; outline-offset: -1.5px; }
     td[draggable="true"] { cursor: grab; transition: box-shadow .12s, transform .12s; }
     td[draggable="true"]:hover { box-shadow: 0 3px 10px rgba(0,0,0,.13); transform: translateY(-1px); position: relative; z-index: 1; }
     td[draggable="true"]:active { cursor: grabbing; }
@@ -177,6 +182,10 @@
     .cell-lec[contenteditable] { cursor: text; border-radius: 3px; padding: 1px 3px; min-width: 30px; display: inline-block; }
     .cell-lec[contenteditable]:hover { background: rgba(255,255,255,.7); }
     .cell-lec[contenteditable]:focus { outline: 1px solid var(--accent); background: #fff; }
+    .wc-lec[contenteditable] { cursor: text; border-radius: 3px; padding: 0 2px; min-width: 22px; display: inline-block; }
+    .wc-lec[contenteditable]:hover { background: rgba(255,255,255,.75); }
+    .wc-lec[contenteditable]:focus { outline: 1px solid var(--accent); background: #fff; }
+    .wk-drop.drag-over { outline: 2px dashed var(--accent); background: #dcfce7 !important; }
     .edit-badge { display: none; background: #fbbf24; color: #78350f; border-radius: 12px; padding: 2px 10px; font-size: .7rem; font-weight: 700; margin-left: 10px; vertical-align: middle; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 10px 22px; border-radius: 8px; font-size: .84rem; z-index: 999; pointer-events: none; animation: fadeInOut 2.5s ease forwards; }
     @keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(8px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0} }
@@ -256,9 +265,9 @@
     <ul style="font-size:.84rem;color:#14532d;padding-left:18px;line-height:1.95">
       <li><strong>Class list answer 可以完全留空</strong> — 系統從頭自動排 Day / Time / Room / Lecturer</li>
       <li>在 <strong>Teacher Availability</strong> 填寫老師不可用時間（N = 不可用），其餘留空</li>
-      <li>系統按優先次序排課：<strong>Mon → Tue → Thu → Wed → Fri</strong></li>
+      <li>DAE 科目只排 <strong>Mon → Tue → Thu</strong>（不排星期三、五）；Cadet 班維持 <strong>Mon / Wed / Fri</strong></li>
       <li>同一班別（group）自動使用同一課室；如課室已滿自動轉用後備課室</li>
-      <li>老師每人每週最多 <strong>6 班</strong>；TKO 時段為 <strong>10:00–14:00 / 15:00–19:00</strong></li>
+      <li>老師每週建議上限 <strong>6 班</strong>（可超過，只會提醒不會阻擋）；TKO 時段為 <strong>10:00–14:00 / 15:00–19:00</strong></li>
       <li>如有「排不到老師」的班別，點擊右上角 <strong>排班規則說明</strong> 了解原因及解決方法</li>
     </ul>
   </div>
@@ -917,8 +926,10 @@
 
   function renderGrid(grid) {
     _grid=grid;
-    const days=DAY_ORDER.filter(d=>grid[d]&&Object.keys(grid[d]).length);
-    if(!days.length)return;
+    // Always show all 5 weekdays (Mon–Fri) — keep Wed/Fri tabs even though DAE
+    // subjects are no longer scheduled there (cadet classes / manual entries may use them).
+    if(!DAY_ORDER.some(d=>grid[d]&&Object.keys(grid[d]).length))return;
+    const days=DAY_ORDER;
     _activeDay=_activeDay&&grid[_activeDay]?_activeDay:days[0];
     document.getElementById('dayTabs').innerHTML=days.map(d=>
       `<button class="day-tab${_activeDay===d?' active':''}" data-day="${d}">${d.slice(0,3)}</button>`
@@ -956,7 +967,7 @@
     const cont=document.getElementById('gridContainer');
     const rows=state.results.filter(r=>r.day&&r.lec1);
     if(!rows.length){ cont.innerHTML='<p class="cal-hint">未有已排班的課堂。</p>'; return; }
-    const days=DAY_ORDER.filter(d=>rows.some(r=>r.day===d));
+    const days=DAY_ORDER;   // always show all 5 weekdays (keep Wed/Fri columns)
     const slotSet=new Set();
     rows.forEach(r=>[r.time1,r.time2].filter(Boolean).forEach(s=>slotSet.add(s)));
     const slots=[...slotSet].sort((a,b)=>slotStart(a)-slotStart(b));
@@ -979,7 +990,7 @@
           const conflict=arr.length>1;
           const subj=(arr[0]||'').split('_')[0];
           const label=arr.map(c=>c.includes('_')?c.split('_')[1]:c).join(' / ');
-          cells+=`<td class="week-cell slot-${subj}${sep}${conflict?' conflict':''}"><div class="wc-code">${label}</div></td>`;
+          cells+=`<td class="week-cell slot-${subj}${sep}${conflict?' conflict':''}"><div class="wc-subj">${subj}</div><div class="wc-code">${label}</div></td>`;
         } else cells+=`<td class="${sep}"></td>`;
       }));
       const nm=t.replace('Mr. ','').replace('Ms. ','');
@@ -993,14 +1004,14 @@
   // Week overview: rooms (rows, grouped by centre) × (day × slot) columns.
   function renderWeekOverview(){
     rebuildGrid();
-    const days=DAY_ORDER.filter(d=>_grid[d]&&Object.keys(_grid[d]).length);
     const cont=document.getElementById('gridContainer');
-    if(!days.length){ cont.innerHTML='<p class="cal-hint">未有已排班的課堂。</p>'; return; }
+    if(!DAY_ORDER.some(d=>_grid[d]&&Object.keys(_grid[d]).length)){ cont.innerHTML='<p class="cal-hint">未有已排班的課堂。</p>'; return; }
+    const days=DAY_ORDER;   // always show all 5 weekdays (keep Wed/Fri columns)
     const slotSet=new Set();
-    days.forEach(d=>Object.values(_grid[d]).forEach(rm=>Object.keys(rm).forEach(s=>slotSet.add(s))));
+    days.forEach(d=>Object.values(_grid[d]||{}).forEach(rm=>Object.keys(rm).forEach(s=>slotSet.add(s))));
     const slots=[...slotSet].sort((a,b)=>slotStart(a)-slotStart(b));
     const rooms=(state.allRooms&&state.allRooms.length)?state.allRooms
-                :[...new Set(days.flatMap(d=>Object.keys(_grid[d])))].sort();
+                :[...new Set(days.flatMap(d=>Object.keys(_grid[d]||{})))].sort();
     let h1='<th rowspan="2" class="room-lbl">Room</th>', h2='';
     days.forEach((d,di)=>{
       h1+=`<th colspan="${slots.length}"${di?' class="day-sep"':''}>${d.slice(0,3)}</th>`;
@@ -1019,13 +1030,64 @@
         const e=((_grid[d]||{})[room]||{})[s];
         if(e){
           const subj=(e.code||'').split('_')[0];
-          const short=(e.code||'').includes('_')?e.code.split('_')[1]:e.code;
-          cells+=`<td class="week-cell slot-${subj}${sep}"><div class="wc-code">${short}</div><div class="wc-lec">${e.lec1||''}</div></td>`;
-        } else cells+=`<td class="${sep}"></td>`;
+          const cmb=e.combined&&e.members;
+          const short=cmb?e.members.map(m=>m.group).join('+'):((e.code||'').includes('_')?e.code.split('_')[1]:e.code);
+          const cmbBadge=cmb?'<span class="wc-combine">合併</span>':'';
+          const eCls=state.editedCodes.has(e.code)?' edited':'';
+          cells+=`<td class="week-cell slot-${subj}${sep}${eCls}${cmb?' combined':''} wk-drop" draggable="true" data-code="${e.code}" data-day="${d}" data-room="${room}" data-slot="${s}"><div class="wc-subj">${subj}</div><div class="wc-code">${short}${cmbBadge}</div><div class="wc-lec" contenteditable="true" spellcheck="false" data-code="${e.code}">${e.lec1||''}</div></td>`;
+        } else cells+=`<td class="wk-drop drop-target${sep}" data-day="${d}" data-room="${room}" data-slot="${s}"></td>`;
       }));
       return ch+`<tr><td class="room-lbl">${lbl}</td>${cells}</tr>`;
     }).join('');
     cont.innerHTML=`<table class="week-table"><thead><tr>${h1}</tr><tr>${h2}</tr></thead><tbody>${body}</tbody></table>`;
+    cont.querySelectorAll('td[draggable="true"]').forEach(td=>td.addEventListener('dragstart',onDragStart));
+    cont.querySelectorAll('.wk-drop').forEach(td=>{
+      td.addEventListener('dragover',e=>{e.preventDefault();td.classList.add('drag-over');});
+      td.addEventListener('dragleave',()=>td.classList.remove('drag-over'));
+      td.addEventListener('drop',onWeekDrop);
+    });
+    cont.querySelectorAll('.wc-lec[contenteditable]').forEach(el=>{
+      el.addEventListener('blur',onLecEdit);
+      el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();el.blur();}});
+    });
+  }
+
+  // Week-view cross-day move: relocate a class to another day/room/slot (or swap).
+  function onWeekDrop(e) {
+    e.preventDefault();
+    const td=e.currentTarget; td.classList.remove('drag-over');
+    if(!_dragCode)return;
+    const newDay=td.dataset.day,newRoom=td.dataset.room,newSlot=td.dataset.slot;
+    const dragEntry=state.results.find(r=>r.class_code===_dragCode);
+    if(!dragEntry){_dragCode=null;return;}
+    const occ=((_grid[newDay]||{})[newRoom]||{})[newSlot];
+    if(occ&&occ.code===_dragCode){_dragCode=null;return;}   // dropped on itself
+    const start=slotToRange(newSlot).start;
+    const is4h=getDurMins(dragEntry)>120;
+    const newTime1=minsToSlot(start,start+120);
+    const newTime2=is4h?minsToSlot(start+120,start+240):null;
+    if(occ){
+      const existEntry=state.results.find(r=>r.class_code===occ.code);
+      if(existEntry){
+        if(getDurMins(existEntry)!==getDurMins(dragEntry)){
+          showToast('⚠ 兩班時長不同，不能互換'); _dragCode=null; return;
+        }
+        const aDay=dragEntry.day,aRoom=dragEntry.room_code,aT1=dragEntry.time1,aT2=dragEntry.time2;
+        dragEntry.day=existEntry.day;dragEntry.room_code=existEntry.room_code;dragEntry.time1=existEntry.time1;dragEntry.time2=existEntry.time2;
+        existEntry.day=aDay;existEntry.room_code=aRoom;existEntry.time1=aT1;existEntry.time2=aT2;
+        state.editedCodes.add(_dragCode);state.editedCodes.add(occ.code);
+        showToast('↔ 互換：'+_dragCode.split('_')[1]+' ↔ '+occ.code.split('_')[1]);
+      }
+    }else{
+      if(is4h){
+        const occ2=((_grid[newDay]||{})[newRoom]||{})[newTime2];
+        if(occ2&&occ2.code!==_dragCode){ showToast('⚠ 下一格已有課，4 小時班放不下'); _dragCode=null; return; }
+      }
+      dragEntry.day=newDay;dragEntry.room_code=newRoom;dragEntry.time1=newTime1;dragEntry.time2=newTime2;
+      state.editedCodes.add(_dragCode);
+      showToast('→ 已搬：'+_dragCode.split('_')[1]+' 到 '+newDay.slice(0,3));
+    }
+    _dragCode=null; renderWeekOverview(); updateEditBadge();
   }
 
   // Month / semester calendar: 15 weeks × Mon-Fri per term, HK holidays marked.
@@ -1063,10 +1125,20 @@
     _grid={};
     state.results.forEach(r=>{
       if(!r.day||!r.room_code)return;
+      const grp=(r.class_code||'').includes('_')?r.class_code.split('_').slice(1).join('_'):r.class_code;
       _grid[r.day]=_grid[r.day]||{};
       _grid[r.day][r.room_code]=_grid[r.day][r.room_code]||{};
       [r.time1,r.time2].filter(Boolean).forEach(slot=>{
-        _grid[r.day][r.room_code][slot]={code:r.class_code,subject_cn:r.name_cn,subject_en:r.name_en,lec1:r.lec1||'',students:r.student_count||0};
+        const cell=_grid[r.day][r.room_code][slot];
+        if(cell){
+          // same room+slot already occupied → this is a CC-combined session
+          cell.combined=true;
+          cell.members.push({code:r.class_code,group:grp,lec1:r.lec1||''});
+          cell.students+=r.student_count||0;
+          cell.cc_group=cell.cc_group||r.cc_group||'';
+        } else {
+          _grid[r.day][r.room_code][slot]={code:r.class_code,subject_cn:r.name_cn,subject_en:r.name_en,lec1:r.lec1||'',students:r.student_count||0,cc_group:r.cc_group||'',combined:false,members:[{code:r.class_code,group:grp,lec1:r.lec1||''}]};
+        }
       });
     });
   }
@@ -1082,7 +1154,7 @@
     allRooms.forEach(r=>buildRoomBlocks(dayData[r]||{}).forEach(b=>{minT=Math.min(minT,b.start);maxT=Math.max(maxT,b.end);}));
     minT=Math.floor(minT/GRID_STEP)*GRID_STEP; maxT=Math.ceil(maxT/GRID_STEP)*GRID_STEP;
     const cols=[]; for(let t=minT;t<maxT;t+=GRID_STEP)cols.push(t);
-    const thead=`<tr><th>Room</th>${cols.map(t=>{const onHour=t%60===0;return `<th style="min-width:34px;font-size:.62rem;${onHour?'font-weight:700':'color:#94a3b8;font-weight:400'}">${minsToLabel(t)}</th>`;}).join('')}</tr>`;
+    const thead=`<tr><th>Room</th>${cols.map(t=>{const onHour=t%60===0;return `<th style="min-width:46px;font-size:.72rem;${onHour?'font-weight:700':'color:#94a3b8;font-weight:400'}">${minsToLabel(t)}</th>`;}).join('')}</tr>`;
 
     // Group rooms by centre (prefix before " - ")
     let prevCentre='';
@@ -1100,14 +1172,18 @@
         if(blk){
           const span=(blk.end-blk.start)/GRID_STEP;
           const subj=(blk.entry.code||'').split('_')[0];
+          const grp=(blk.entry.code||'').includes('_')?blk.entry.code.split('_').slice(1).join('_'):'';
+          const cmb=blk.entry.combined&&blk.entry.members;
+          const groups=cmb?blk.entry.members.map(m=>m.group).join(' + '):grp;
+          const cmbBadge=cmb?'<span class="cell-combine">合併</span>':'';
           const eCls=state.editedCodes.has(blk.entry.code)?' edited':'';
           const cc=state.crossCentreMap[blk.entry.code];
           const ccCls=cc?' cross-centre':'';
           const ccBadge=cc?`<div class="cell-cross">⇄ ${cc.from}→${cc.to}</div>`:'';
-          cells+=`<td colspan="${span}" class="slot-${subj}${eCls}${ccCls}" draggable="true"
+          cells+=`<td colspan="${span}" class="slot-${subj}${eCls}${ccCls}${cmb?' combined':''}" draggable="true"
               data-code="${blk.entry.code}" data-day="${day}" data-room="${room}"
               data-start="${blk.start}" data-end="${blk.end}">
-            <div class="cell-code">${blk.entry.code}</div>
+            <div class="cell-code"><span class="cell-subjcode">${subj}</span>${groups?`<span class="cell-grp">${groups}</span>`:''}${cmbBadge}</div>
             <div class="cell-time">${minsToLabel(blk.start)}–${minsToLabel(blk.end)}</div>
             <div class="cell-subj">${blk.entry.subject_cn||''}</div>
             <div class="cell-lec" contenteditable="true" spellcheck="false" data-code="${blk.entry.code}">${blk.entry.lec1||''}</div>

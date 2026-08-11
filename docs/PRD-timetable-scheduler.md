@@ -1,0 +1,167 @@
+# PRD — HKIT Timetable Scheduler
+
+**Status:** Active · **Engine version:** V6 (V6.4 + 2026-08 updates)
+**Last updated:** 2026-08-11
+**Owner:** HKIT scheduling (kmkaiuse-bit/timetable)
+**Related docs:** `MASTER_PLAN.md` (constraint status of record), `docs/pending-updates-2026-08.md`
+
+> This PRD was first created on 2026-08-11. No PRD file existed in the repo before this;
+> constraint decisions had lived in `MASTER_PLAN.md` and the meeting docs under `docs/meetings/`.
+
+---
+
+## 1. Purpose
+
+Automate HKIT's class timetable scheduling. Given an Excel workbook describing classes,
+teachers, and rooms, the system produces a complete timetable — assigning each class a
+Day, Time, Room and Lecturer — that satisfies all hard constraints and optimises soft
+ones, then surfaces every class it could not place with a diagnosed reason.
+
+## 2. Users & stakeholders
+
+- **Scheduler (primary user):** uploads the Excel, generates the timetable, reviews
+  issues/warnings, hand-edits, downloads the Excel output.
+- **Jo:** owns the scheduling rules and data decisions (capacity, combine groups, Net
+  teachers). Open questions are tracked as J1–J10 (§10).
+
+## 3. Architecture
+
+```
+Excel (.xlsx)
+  └─ api/timetable_scheduler.py   Python engine, SQLite in-memory
+        ├─ Phase 0  pre-schedule cadet classes (Mon/Wed/Fri, fixed rooms)
+        ├─ Phase A  schedule Core classes (cc_group empty)
+        ├─ Phase B  schedule CC Combine classes (cc_group set)
+        └─ Teacher assignment (5-pass)
+  └─ api/index.py                 Flask API (Vercel serverless entry point)
+  └─ api/v4.html                  Web UI (served for all routes except /v3)
+```
+
+**Deploy:** Vercel; `api/index.py` handles all routes. The `api/` layout must not change.
+
+## 4. Inputs
+
+Excel workbook (`data/input/…xlsx`) with sheets including **Class list**, teachers, rooms,
+availability. Key Class-list columns: class code (e.g. `DAE101_TS1`), subject/lecturer
+names, Loading (hrs), Student No, and optional **Venue / Time / Date** and **CC Group**.
+
+**Auto-assign gate:** the engine auto-schedules only when the Class-list Day/Time answers
+are all empty (`n_sched == 0`). If any rows are pre-filled, the existing schedule is used
+as-is and Phases 0/A/B (and the day rules, and CC combine) are skipped. The production
+file `Planning for Timetable.xlsx` is pre-filled; the clean/template files auto-assign.
+
+## 5. Functional requirements
+
+### 5.1 Day rules  *(updated 2026-08)*
+
+- **DAE subjects are scheduled on Monday, Tuesday, Thursday only** — never Wednesday or
+  Friday. Implemented as `_DAY_PRIORITY = [Monday, Tuesday, Thursday]`.
+- **Cadet classes keep Monday / Wednesday / Friday** as an explicit exception, via
+  `_CADET_DAY_PRIORITY` in Phase 0 (independent of `_DAY_PRIORITY`).
+
+### 5.2 Hard constraints
+
+| ID | Rule |
+|----|------|
+| H1 | No teacher double-booking in a slot |
+| H2 | No room double-booking in a slot |
+| H3 | Students attend at their enrolled campus (TS→TM toggle `_TS_TM_ENABLED`, pending J1) |
+| H4 | Teacher weekly loading — **soft cap 6, warn only, never block** (see 5.5) |
+| H5 | CC Combine members share subject + language |
+| H6 | TKO classes start ≥ 10:00 |
+| H7 | Teacher qualified for the subject |
+| H8 | Teacher at one centre per day; cross-centre allowed if travel ≤ 90 min (warn), else hard block |
+| H9 | Students at one centre per day (exceptions: CSW↔SSP, TW↔CSW, TW↔SSP) |
+
+### 5.3 Soft constraints
+
+S1a unavailability · S1b centre preference · S2 no 天地堂 gap (students) · S3 same-subject
+day rotation · S4 CC prefers centre with most students.
+
+### 5.4 CC Combine  *(Phase B)*
+
+Classes sharing a **CC Group** label are combined into one scheduled session.
+- L1: find a day where no member has a Core class at a different centre.
+- L2: if L1 fails, try the next-best centre; else report the group unplaced.
+- Combine groups are input data (CC Group column), not code. Jo's DAE106 groups captured
+  2026-08 (§10, `scripts/add_dae106_combine.py`).
+
+### 5.5 Teacher assignment (5-pass) & loading
+
+Five-pass Lec1 search relaxing, in order: quota → centre pref (S1b warn) → H4 cap (H4
+soft warn) → unavailability (S1 warn). **Loading may exceed 6**; when it does the engine
+warns and the UI flags the teacher red — it never blocks or refuses the class. Backups
+Lec2/Lec3 do not count toward loading. A single global threshold of 6 applies (no
+per-teacher caps — no data source, not required).
+
+## 6. UI requirements  *(updated 2026-08)*
+
+- **Four views:** Day, Week·by-room, Week·by-teacher, Month/semester calendar.
+- **Full-width layout:** main container widened to 1440px so the timetable uses the whole
+  page width.
+- **Subject code in every cell:** each class cell shows the subject code (e.g. `DAE101`)
+  as a bold badge across Day / Week·room / Week·teacher; enlarged fonts and cells.
+- **Keep all five weekdays:** every view always renders Mon–Fri, keeping Wed/Fri
+  columns/tabs even when empty (cadet classes and manual entries can still use them).
+- Teacher Loading panel colours any teacher above 6 sessions red (超限). Issues panel and
+  warnings surface unplaced classes and soft-constraint relaxations.
+
+## 7. Outputs
+
+Excel workbook (`Timetable_V4_Output.xlsx`) with the timetable, an Issues sheet, semester
+calendar sheets (15 weeks with HK holidays), and teacher loading. Web UI mirrors these.
+
+## 8. Known limitations & capacity  *(measured 2026-08, auto-assign)*
+
+- Restricting DAE to 3 days (Mon/Tue/Thu) concentrates demand and **worsens room
+  shortage** — FL / TS / CSW are the binding constraints (FL and TS each have only one
+  room; CSW's large rooms fill up).
+- **Room-capacity bug (fixed 2026-08).** `_pick_room` assigned each group its home room
+  by number (CS6 → CSW - C6) **without checking capacity**, so classes were silently
+  placed in rooms too small for them (e.g. DAE108_CS6, 33 students, in a 25-seat room).
+  This masked the true shortage: the reported "placed" count included many over-capacity
+  placements. After the fix (home room must fit; else best-fit search) **there are zero
+  over-capacity placements**, and the honest unplaced count is higher:
+  - clean input: **28 over-capacity placements → 0; unplaced 14 → 31**.
+  - a representative user file: 15 over-capacity → 0; unplaced 20 → 24.
+- **Combine helps only small classes.** Filling the CC Group column merges classes into
+  one shared room+slot, freeing rooms — but only when the merged total fits one room
+  (small groups). It cannot rescue the large FL/CSW classes that individually exceed room
+  capacity. The Phase-B combine placer was also fixed (2026-08) to try **all rooms and
+  all valid days** instead of the first only, so valid combines are no longer abandoned
+  prematurely (a user file's DAE102 TS→TM combines went from failing to placing;
+  unplaced 26 → 20 before the capacity fix).
+- **Bottom line — this is a capacity decision for Jo**, not a scheduler defect: add rooms
+  at FL / TS / CSW, relocate classes, or accept the honest unplaced list. Wed/Fri use for
+  DAE is explicitly ruled out by the requirement, so the 3-day ceiling stands.
+
+## 9. Configurable toggles (`api/timetable_scheduler.py`)
+
+`_DAY_PRIORITY` (Mon/Tue/Thu) · `_CADET_DAY_PRIORITY` (Mon/Wed/Fri) ·
+`_TEACHER_WEEKLY_SESSION_CAP` (6) · `_TS_TM_ENABLED` (J1) · `_CC_MAX_TRAVEL_MIN` (J2) ·
+`_H8_MAX_TRAVEL_MIN` (90) · `_ENG_NET_MIN_BLOCKS` (1, J9).
+
+## 10. Open questions for Jo
+
+Carried from `MASTER_PLAN.md`: J1 (TS→TM), J2 (CC travel threshold), J3 (cadet rooms),
+J5 (cost), J6 (teacher list), J8 (room overflow FL/SW/TKO/ST/TM), J9 (Net block = 20 hrs),
+J10 (KT1/WT2 Net coverage). J4 answered (Net teachers).
+
+New (2026-08, combine course):
+1. `DAE106_TM3` and `DAE106_KT4` were missing from the Class list; appended with Jo's
+   student counts (8, 9) and cloned subject/loading — confirm details.
+2. Student counts on Jo's combine sheet differ from the workbook (e.g. CS6 10 vs 33) —
+   which snapshot is authoritative? (Existing counts not overwritten.)
+3. 4 of 5 combine groups cannot be placed under the no-Wed/Fri rule — accept, or handle
+   the affected DAE106 combine classes manually?
+
+## 11. Version history
+
+| Date | Version | What |
+|------|---------|------|
+| 2026-05 | V3–V5 | Pre-filled → V4 auto-assign → constraint refinements, CC two-phase |
+| 2026-05-23 → 06-09 | V6–V6.3 | Soft H4/H8, H6/H9 relaxations, reason codes, Issues panel, J1/J8 assumptions |
+| 2026-07-08 | V6.4 | English auto-assign fixes; true V4 on clean input (111/111) |
+| 2026-08-11 | 2026-08 | DAE Mon/Tue/Thu (cadet Mon/Wed/Fri); H4 soft-cap verified; UI (wide container, subject code, keep Wed/Fri); DAE106 combine groups captured |
+| 2026-08-11 | 2026-08b | Full-width UI; week-view cross-day drag + inline lecturer edit; UI shows combined classes' constituent classes; CC Group column + docs added to templates |
+| 2026-08-11 | 2026-08c | **Correctness fixes:** combine placer tries all rooms/valid days; `_pick_room` capacity check + best-fit (eliminates over-capacity placements — see §8) |
