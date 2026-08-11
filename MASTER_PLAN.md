@@ -174,4 +174,23 @@ H8 never relaxed. Cross-centre with travel >90 min = hard block in all passes.
 | `_CC_MAX_TRAVEL_MIN` | `None` | Jo confirms CC distance threshold (J2) |
 | `_H8_MAX_TRAVEL_MIN` | `90` | Adjust if Jo changes travel limit |
 | `_TEACHER_WEEKLY_SESSION_CAP` | `6` | Adjust if cap changes |
+| `_DAY_PRIORITY` | `[Mon, Tue, Thu]` | DAE subjects — no Wed/Fri (2026-08). Cadets use `_CADET_DAY_PRIORITY` |
 | `_ENG_NET_MIN_BLOCKS` | `1` | Set to 2 if Jo confirms 1 block = 10 Net hrs (needs 2/term) — see J9 |
+
+---
+
+## 2026-08 Updates (branch `feat/aug2026-timetable-updates`, not merged)
+
+See `docs/pending-updates-2026-08.md` for full detail, impact numbers, and Jo follow-ups.
+
+1. **DAE Mon/Tue/Thu only** — `_DAY_PRIORITY` restricted; cadets keep Mon/Wed/Fri via
+   new `_CADET_DAY_PRIORITY`. Auto-assign only. Worsens room shortage
+   (scheduled 111→94, SLOT_ROOM 1→14 on clean input) — capacity decision for Jo.
+2. **Teacher loading soft cap** — verified already correct (H4 warns above 6, never
+   blocks; UI flags red). No code change; per-teacher caps not added (no data source).
+3. **UI** — container widened 980→1440px, all four views enlarged, subject code shown
+   in every cell, Wed/Fri columns kept even when empty.
+4. **Combine course (DAE106)** — Jo's 5 groups captured into a "CC Group" column via
+   `scripts/add_dae106_combine.py` → `data/input/Planning for Timetable (CC combine).xlsx`.
+   Two classes (DAE106_TM3, DAE106_KT4) were missing and appended; student-count
+   discrepancy vs Jo's sheet left unresolved — both need Jo's confirmation.
