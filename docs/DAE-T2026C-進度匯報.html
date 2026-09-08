@@ -1,0 +1,609 @@
+<title>DAE T2026C 排課進度</title>
+<style>
+  :root {
+    --paper: #FCFCFA;
+    --surface: #F3F2EE;
+    --ink: #18212C;
+    --slate: #58616E;
+    --hairline: #DEDCD5;
+    --accent: #14615C;
+    --accent-dim: #E3ECEA;
+    --amber: #8F5E10;
+    --amber-dim: #F6EEDC;
+    --clay: #9A382C;
+    --clay-dim: #F7E7E4;
+
+    --font-display: Georgia, "Times New Roman", "Noto Serif CJK TC",
+      "Source Han Serif TC", "Songti TC", "PingFang TC", serif;
+    --font-body: "PingFang TC", "PingFang HK", "Microsoft JhengHei",
+      "Noto Sans TC", "Hiragino Sans TC", system-ui, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14181D;
+      --surface: #1C2229;
+      --ink: #E9E7E1;
+      --slate: #9AA3AE;
+      --hairline: #2C343C;
+      --accent: #5FB8AE;
+      --accent-dim: #1B2E2C;
+      --amber: #D8A94F;
+      --amber-dim: #2E2718;
+      --clay: #E08776;
+      --clay-dim: #2E1E1B;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #14181D;
+    --surface: #1C2229;
+    --ink: #E9E7E1;
+    --slate: #9AA3AE;
+    --hairline: #2C343C;
+    --accent: #5FB8AE;
+    --accent-dim: #1B2E2C;
+    --amber: #D8A94F;
+    --amber-dim: #2E2718;
+    --clay: #E08776;
+    --clay-dim: #2E1E1B;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.75;
+    margin: 0;
+    padding: 3.5rem 1.5rem 4rem;
+  }
+
+  .sheet {
+    max-width: 60rem;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .eyebrow {
+    font-size: .72rem;
+    letter-spacing: .16em;
+    color: var(--slate);
+    text-transform: uppercase;
+    margin: 0 0 .9rem;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+    line-height: 1.25;
+    margin: 0 0 .8rem;
+    text-wrap: balance;
+    letter-spacing: .01em;
+  }
+
+  .lede {
+    font-size: 1.05rem;
+    color: var(--slate);
+    margin: 0;
+    max-width: 42em;
+  }
+
+  .lede strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 1.15rem;
+    margin: 0 0 1.1rem;
+    padding-bottom: .55rem;
+    border-bottom: 1px solid var(--hairline);
+    letter-spacing: .02em;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 1px;
+    background: var(--hairline);
+    border-block: 1px solid var(--hairline);
+  }
+
+  .stat {
+    background: var(--paper);
+    padding: 1.1rem 1.1rem 1.2rem;
+  }
+
+  .stat .n {
+    font-family: var(--font-display);
+    font-size: 2.05rem;
+    line-height: 1;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+
+  .stat .n small {
+    font-size: .95rem;
+    color: var(--slate);
+    margin-left: .18em;
+  }
+
+  .stat .k {
+    font-size: .8rem;
+    color: var(--slate);
+    margin-top: .5rem;
+    display: block;
+  }
+
+  .files {
+    list-style: none;
+    margin: 1.2rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem .55rem;
+  }
+
+  .files li {
+    font-size: .82rem;
+    color: var(--slate);
+    border: 1px solid var(--hairline);
+    padding: .22rem .6rem;
+  }
+
+  .caps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .caps li {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr;
+    gap: .2rem;
+    align-items: start;
+  }
+
+  .caps .tick {
+    color: var(--accent);
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+
+  .caps b {
+    font-weight: 600;
+  }
+
+  .caps span.note {
+    color: var(--slate);
+  }
+
+  .case {
+    background: var(--accent-dim);
+    border-left: 3px solid var(--accent);
+    padding: 1.2rem 1.4rem;
+  }
+
+  .case h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 1.05rem;
+    margin: 0 0 .45rem;
+  }
+
+  .case p {
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .case p+p {
+    margin-top: .5rem;
+    color: var(--slate);
+    font-size: .9rem;
+  }
+
+  table.grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .88rem;
+    margin-top: .6rem;
+  }
+
+  table.grid th,
+  table.grid td {
+    text-align: left;
+    vertical-align: top;
+    padding: .6rem .8rem .6rem 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  table.grid th {
+    font-size: .76rem;
+    letter-spacing: .06em;
+    color: var(--slate);
+    font-weight: 600;
+    border-bottom: 1px solid var(--ink);
+  }
+
+  table.grid td:first-child {
+    font-weight: 600;
+    padding-right: 1.2rem;
+  }
+
+  table.grid td.ref {
+    color: var(--accent);
+    white-space: nowrap;
+    font-weight: 400;
+  }
+
+  .tablewrap {
+    overflow-x: auto;
+  }
+
+  ol.found {
+    margin: .8rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: .55rem;
+    counter-reset: f;
+  }
+
+  ol.found li {
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    gap: .5rem;
+    font-size: .9rem;
+    line-height: 1.65;
+  }
+
+  ol.found li::before {
+    counter-increment: f;
+    content: counter(f);
+    font-family: var(--font-display);
+    font-size: .85rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    padding-top: .1rem;
+  }
+
+  .open {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: .1rem;
+  }
+
+  .open li {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr;
+    gap: .9rem;
+    padding: .7rem 0;
+    border-bottom: 1px solid var(--hairline);
+    align-items: baseline;
+  }
+
+  .open li:first-child {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .chip {
+    font-size: .72rem;
+    letter-spacing: .06em;
+    padding: .18rem .5rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .chip.wait {
+    background: var(--amber-dim);
+    color: var(--amber);
+  }
+
+  .chip.data {
+    background: var(--surface);
+    color: var(--slate);
+  }
+
+  .chip.note {
+    background: var(--amber-dim);
+    color: var(--amber);
+  }
+
+  .chip.done {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .open b {
+    font-weight: 600;
+  }
+
+  .open .sub {
+    display: block;
+    color: var(--slate);
+    font-size: .88rem;
+  }
+
+  .open .ask {
+    display: block;
+    margin-top: .4rem;
+    font-size: .88rem;
+    color: var(--ink);
+    border-left: 2px solid var(--accent);
+    padding-left: .6rem;
+  }
+
+  .open .ask em {
+    font-style: normal;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .items {
+    list-style: none;
+    margin: .5rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: .3rem;
+    font-size: .86rem;
+  }
+
+  .items li {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: .7rem;
+  }
+
+  .items code {
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    font-size: .8rem;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .items span {
+    color: var(--slate);
+  }
+
+  @media (max-width: 40rem) {
+    .items li {
+      grid-template-columns: 1fr;
+      gap: .1rem;
+    }
+  }
+
+  footer {
+    border-top: 1px solid var(--hairline);
+    padding-top: 1rem;
+    font-size: .8rem;
+    color: var(--slate);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+
+  @media (max-width: 34rem) {
+    .open li {
+      grid-template-columns: 1fr;
+      gap: .3rem;
+    }
+
+    .chip {
+      justify-self: start;
+    }
+  }
+</style>
+
+<div class="sheet">
+
+  <header>
+    <p class="eyebrow">進度匯報 · 2026 年 8 月 18 日</p>
+    <h1>DAE T2026C 排課進度</h1>
+  </header>
+
+  <section>
+    <h2>已交付</h2>
+    <div class="stats">
+      <div class="stat"><span class="n">30<small>／34</small></span><span class="k">個科目全部班別已排好週表</span></div>
+      <div class="stat"><span class="n">168<small>／175</small></span><span class="k">個科班已定日子、時間、課室</span></div>
+      <div class="stat"><span class="n">168</span><span class="k">個英文教學 block 全數指派</span></div>
+      <div class="stat"><span class="n">5<small>位</small></span><span class="k">教師鐘數命中合約目標</span></div>
+      <div class="stat"><span class="n">6<small>／6</small></span><span class="k">自動查出的衝突已全部修正</span></div>
+    </div>
+    <ul class="files">
+      <li>Classes 日子／時間／課室</li>
+      <li>Daily Timetable</li>
+      <li>英文 Net 教師編排及工時表</li>
+      <li>教師檢視時間表</li>
+      <li>班別檢視時間表</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>現時可以做到</h2>
+    <ul class="caps">
+      <li><span class="tick">▍</span><span><b>出問題可以查出原因再改。</b><span
+            class="note">今次自動查出六項真實衝突，包括兩格漏填課室，以及一位老師在同一時段被排到兩間課室。每一項都指明是哪個檔案、哪張工作表、哪一格。</span></span></li>
+      <li><span class="tick">▍</span><span><b>每一份編排都可以即時驗證。</b><span
+            class="note">英文老師編排無論由誰產生，都可以在數秒內驗出違規——同一時間教兩班、超出合約鐘數、跨中心車程超標——並指到確實的儲存格。這類問題在報表上看不出來，因為報表沒有日期時間欄。</span></span>
+      </li>
+      <li><span class="tick">▍</span><span><b>工具已交予課程組同事。</b><span
+            class="note">連同一份指引：照四個步驟貼一次，之後用日常說話吩咐即可。</span></span></li>
+    </ul>
+  </section>
+
+  <section class="case">
+    <h3>其中一個實例：安排英文科老師</h3>
+    <p>課程組提出的要求大致是：28 個英文班，每班全年 6 段五週的課、每段 20 小時，共 120 小時。Net 老師方面，Mr. Peter Barrett 360 小時、Ms. Loveleen Kaur 680 小時；Mr.
+      Ivan Yuen 負責 CS1 和 CS2 各 100 小時。先出預覽，確認後才出正式檔。</p>
+    <p>換算下來，要決定的是 <b>28 班 × 6 段 = 168 格</b>，每格派一位老師。而每一格都要同時符合幾項條件：合約鐘數不可超、同一時段不可教兩班、同日跨中心的車程有上限、全職老師的鐘數要先填滿。</p>
+    <p>做法是把要求和條件逐項寫清楚，交由 AI 模型找出符合全部條件的組合，再自動驗證。</p>
+    <p><b>168 格全部排定</b>，五位有合約鐘數的老師全部準確命中目標。</p>
+  </section>
+
+  <section>
+    <h2>同事實際使用後的回饋</h2>
+    <p style="margin:0;">以下十二項，全部由 <b>Jo 在實際排課過程中逐項試用、發現並記錄</b>。目前仍然需要逐個研究，如何解決。</p>
+    <ol class="found">
+      <li><span>收生數字要排班之前，仍要先人手做預處理——開多少班、每班多少人、合併班怎樣分組——才交給系統。</span></li>
+      <li><span>排出來會有老師需要跨中心的情況，要人手再調。</span></li>
+      <li><span>叫它改一個問題，改完之後出現另一個原本沒有的問題。</span></li>
+      <li><span>不撞堂做得到，但派老師仍然要人手介入調整。</span></li>
+      <li><span>老師跨中心的車程限制未能完全遵守。</span></li>
+      <li><span>未能遵守老師偏好——兩班同在黃大仙，上下午派了不同老師；其實可以是同一位，就不用走中心。</span></li>
+      <li><span>有一版沒有撞堂、也沒有其他錯誤，但星期一排了十六堂英文、星期二和三各六堂。分佈不平衡，而且實際上沒有足夠老師這樣排。</span></li>
+      <li><span>叫它修改第一版，出第二版時第一版不見了。</span></li>
+      <li><span>叫它只安排星期一、二、四，它自行把星期三、五的堂刪掉。</span></li>
+      <li><span>未能靈活處理——一位老師可以教幾科，人手排班時可以安排他在同一中心教不同班，系統沒有照顧到。</span></li>
+      <li><span>明明設定好，它改動了設定，令預算計算出錯，最終要人手介入。</span></li>
+      <li><span>合併班目前仍需人手介入。系統未能自行判斷哪幾班位於鄰近中心、可以合併成一堂上課。</span></li>
+    </ol>
+    <p style="margin:1.1rem 0 .2rem;color:var(--slate);">逐項核對過程式之後，歸納為四類原因，另有一項不屬於系統問題。</p>
+    <div class="tablewrap">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>原因</th>
+            <th>涉及</th>
+            <th>說明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>規則未寫進系統</td>
+            <td class="ref">6 · 7 · 10</td>
+            <td>
+              系統只會遵守已寫明的規則。「每日可調配的老師人數」、「同一中心的上下午盡量派同一位老師」、「一位老師可跨科任教」這三項從未寫進去，所以排出來合乎所有已知規則，實際卻不可行——例如星期一排了十六堂英文、星期二三各六堂，人手根本不足。
+            </td>
+          </tr>
+          <tr>
+            <td>車程限制過寬</td>
+            <td class="ref">2 · 4 · 5</td>
+            <td>英文科的 30 分鐘上限是硬性，但其他科目目前設為 90 分鐘，而且只作提示、不作阻止。因此會看到老師需要跨中心，要人手再調。</td>
+          </tr>
+          <tr>
+            <td>改動沒有邊界，<br>也沒有回歸檢查</td>
+            <td class="ref">3 · 9 · 11</td>
+            <td>吩咐改甲，它動了乙；吩咐只排一、二、四，它把三、五的資料刪掉；吩咐守住設定，它改了設定以致預算計錯。改完之後亦沒有與上一版比較，所以新產生的問題無人察覺。</td>
+          </tr>
+          <tr>
+            <td>沒有版本保護</td>
+            <td class="ref">8</td>
+            <td>輸出檔名固定，新版直接覆蓋舊版，改壞了無法退回。</td>
+          </tr>
+          <tr>
+            <td>合併班未能自行分組</td>
+            <td class="ref">12</td>
+            <td>系統可以按指定的分組去排，但無法自行判斷哪幾班位於鄰近中心、值得合併。判斷中心距離的功能其實已內建，但因為一直未確認「多少分鐘車程之內算鄰近」，所以從未啟用。</td>
+          </tr>
+          <tr>
+            <td>上游仍靠人手</td>
+            <td class="ref">1</td>
+            <td>開多少班、每班多少人，目前仍由 Jo 判斷後才交給系統。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>改善方向</h2>
+    <div class="tablewrap">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>要做的事</th>
+            <th>對應</th>
+            <th>可行性</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>輸出檔加上日期版本，不覆蓋舊檔</td>
+            <td class="ref">8</td>
+            <td>可即時做</td>
+          </tr>
+          <tr>
+            <td>每次改動後自動與上一版比較，列出「新增了什麼問題」</td>
+            <td class="ref">3</td>
+            <td>可即時做</td>
+          </tr>
+          <tr>
+            <td>明文禁止刪除資料；「只排某幾日」視為篩選，不是刪除</td>
+            <td class="ref">9</td>
+            <td>可即時做</td>
+          </tr>
+          <tr>
+            <td>設定檔的改動必須列出前後對照</td>
+            <td class="ref">11</td>
+            <td>可即時做</td>
+          </tr>
+          <tr>
+            <td>確認「多少分鐘車程之內算鄰近」，啟用已內建的合併班距離篩選</td>
+            <td class="ref">12</td>
+            <td>只需 Jo 確認一個數字</td>
+          </tr>
+          <tr>
+            <td>加入「每日可調配老師人數」上限</td>
+            <td class="ref">7</td>
+            <td>需同事先提供每科每日的可用老師數</td>
+          </tr>
+          <tr>
+            <td>同一日同一中心的上下午優先派同一位老師</td>
+            <td class="ref">6 · 10</td>
+            <td>需先確認規則，再試算</td>
+          </tr>
+          <tr>
+            <td>其他科目的車程上限收緊並改為硬性</td>
+            <td class="ref">2 · 5</td>
+            <td>需先確認上限，再試算</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:1rem;">
+      <b>實話實說：</b>上表前四項是流程上的保護，可以即時加入。後三項會改變排班結果本身，必須由同事先確認新規則、再試算，才能落實——收緊車程尤其會令排班變緊，可能出現原本排得到、之後排不到的情況。<b>在這三項落實之前，老師編排仍然需要人手覆核。</b>
+    </p>
+  </section>
+
+  <section>
+    <h2>AOB</h2>
+    <ul class="open">
+      <li><span class="chip done">已完成</span><span><b>六項衝突全部修正</b><span
+            class="sub">包括兩格漏填的課室、一位老師三次同時被排到兩間課室，以及一班學生同時有兩科。系統查出位置，<b>由 Jo
+              逐項覆核並修正</b>——當中要判斷哪一班該留、哪一班要調，這部分只有熟悉課程的人做得到。8 月 18 日的版本重驗，零衝突。</span></span></li>
+      <li><span class="chip data">未有資料</span><span><b>四個科目共七個科班未排</b><span class="sub">DAE256 及 DAE260 已排好六班、各欠兩班；DAE258 及 DAE270 則整科未排。全部因外部資料未到，並非排不出：</span>
+          <ul class="items">
+            <li><code>DAE256_G · DAE256_H</code><span>警察學院另行安排</span></li>
+            <li><code>DAE258_G · DAE258_H</code><span>警察學院另行安排</span></li>
+            <li><code>DAE260_G · DAE260_H</code><span>警察學院另行安排</span></li>
+            <li><code>DAE270</code><span>待 AASFP 確認師資，或順延至 T2027A</span></li>
+          </ul>
+          <span class="ask"><em>直接問題：</em>警察學院的排班表哪一天到？DAE270 這個學期開不開？</span>
+        </span></li>
+      <li><span class="chip data">未有資料</span><span><b>週六第 15 堂日期</b><span class="sub">校曆上仍為 TBC，該六班暫按 14 個上課日計算。</span>
+          <span class="ask"><em>直接問題：</em>週六第 15 堂定在哪一日？</span></span></li>
+      <li><span class="chip note">要留意</span><span><b>英文 Net 編排沒有鬆動空間</b><span class="sub">28 個英文班只落在六個時段上，Net
+            教師每一個五週期都必須教足六個時段。任何一個英文班改動日子或時間，都要重算，且未必仍然排得出。</span>
+          <span class="ask"><em>直接問題：</em>若日後要調動英文班時段，能否接受重算後有一兩班沒有 Net 老師？</span></span></li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>DAE 課程 · T2026C（2026 年 9 月至 12 月）</span>
+    <span>下一步：待警察學院檔案及週六日期到齊，重出全部檔案</span>
+  </footer>
+
+</div>
